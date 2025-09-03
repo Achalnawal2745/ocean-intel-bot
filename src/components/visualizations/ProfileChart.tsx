@@ -14,6 +14,17 @@ interface ProfileChartProps {
 }
 
 export const ProfileChart: React.FC<ProfileChartProps> = ({ data, spec }) => {
+  // Early return for invalid data
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return (
+      <Card className="border-warning/20">
+        <CardContent className="p-6 text-center text-muted-foreground">
+          No profile data available for visualization
+        </CardContent>
+      </Card>
+    );
+  }
+
   const { y, x_opts = ["temperature"], invert_y = false, group_by } = spec;
   
   const groupedData = group_by 
@@ -26,10 +37,24 @@ export const ProfileChart: React.FC<ProfileChartProps> = ({ data, spec }) => {
     : { all: data };
 
   const getStats = (values: number[]) => {
-    if (values.length === 0) return { min: 0, max: 0, avg: 0 };
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    if (!values || values.length === 0) return { min: 0, max: 0, avg: 0 };
+    
+    // Filter out any NaN values first
+    const validValues = values.filter(v => !isNaN(v) && isFinite(v));
+    if (validValues.length === 0) return { min: 0, max: 0, avg: 0 };
+    
+    // Use reduce instead of spread operator to avoid stack overflow with large arrays
+    let min = validValues[0];
+    let max = validValues[0];
+    let sum = 0;
+    
+    for (const value of validValues) {
+      if (value < min) min = value;
+      if (value > max) max = value;
+      sum += value;
+    }
+    
+    const avg = sum / validValues.length;
     return { min, max, avg };
   };
 
@@ -56,17 +81,23 @@ export const ProfileChart: React.FC<ProfileChartProps> = ({ data, spec }) => {
               )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {x_opts.map((param) => {
-                  const values = (groupData as any[])
-                    .filter(d => d[param] != null && d[y] != null)
-                    .map(d => d[param]);
+                {x_opts.filter(param => param && typeof param === 'string').map((param) => {
+                  // Filter and validate data more carefully
+                  const validData = (groupData as any[]).filter(d => 
+                    d && 
+                    typeof d === 'object' && 
+                    d[param] != null && 
+                    d[y] != null &&
+                    !isNaN(parseFloat(d[param])) &&
+                    !isNaN(parseFloat(d[y]))
+                  );
+                  
+                  const values = validData.map(d => parseFloat(d[param]));
+                  const pressureValues = validData.map(d => parseFloat(d[y]));
                   
                   if (values.length === 0) return null;
                   
                   const stats = getStats(values);
-                  const pressureValues = (groupData as any[])
-                    .filter(d => d[param] != null && d[y] != null)
-                    .map(d => d[y]);
                   const depthRange = getStats(pressureValues);
                   
                   return (
