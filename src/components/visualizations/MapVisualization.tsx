@@ -1,9 +1,9 @@
 import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Map, Navigation } from "lucide-react";
+import { Map } from "lucide-react";
 
 // Fix Leaflet default marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -82,6 +82,15 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
     shadowSize: [41, 41]
   });
 
+  // Fit map to bounds once when available
+  const FitBounds: React.FC<{ bounds: [[number, number], [number, number]] }> = ({ bounds }) => {
+    const map = useMap();
+    useEffect(() => {
+      map.fitBounds(bounds as any, { padding: [50, 50] });
+    }, [map, bounds]);
+    return null;
+  };
+
   return (
     <Card className="border-accent/20">
       <CardHeader>
@@ -95,7 +104,6 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
           <MapContainer 
             center={center} 
             zoom={zoom} 
-            bounds={bounds}
             className="w-full h-[400px] rounded-lg shadow-lg z-0"
             style={{ minHeight: '400px' }}
           >
@@ -137,6 +145,7 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
                 </Popup>
               </Marker>
             )}
+            {bounds && <FitBounds bounds={bounds} />} 
           </MapContainer>
           
           {/* Path stats overlay */}
@@ -146,11 +155,11 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
               {start && end && (
                 <>
                   <div className="flex items-center space-x-2 text-xs">
-                    <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                    <div className="h-2 w-2 rounded-full bg-success"></div>
                     <span>Start: {start.lat.toFixed(2)}°, {start.lon.toFixed(2)}°</span>
                   </div>
                   <div className="flex items-center space-x-2 text-xs">
-                    <div className="h-2 w-2 rounded-full bg-red-500"></div>
+                    <div className="h-2 w-2 rounded-full bg-destructive"></div>
                     <span>End: {end.lat.toFixed(2)}°, {end.lon.toFixed(2)}°</span>
                   </div>
                 </>
