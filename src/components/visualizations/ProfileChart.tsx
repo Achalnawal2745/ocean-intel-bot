@@ -2,6 +2,7 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BarChart3, TrendingDown } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface ProfileChartProps {
   data: any[];
@@ -36,28 +37,6 @@ export const ProfileChart: React.FC<ProfileChartProps> = ({ data, spec }) => {
       }, {} as Record<string, any[]>)
     : { all: data };
 
-  const getStats = (values: number[]) => {
-    if (!values || values.length === 0) return { min: 0, max: 0, avg: 0 };
-    
-    // Filter out any NaN values first
-    const validValues = values.filter(v => !isNaN(v) && isFinite(v));
-    if (validValues.length === 0) return { min: 0, max: 0, avg: 0 };
-    
-    // Use reduce instead of spread operator to avoid stack overflow with large arrays
-    let min = validValues[0];
-    let max = validValues[0];
-    let sum = 0;
-    
-    for (const value of validValues) {
-      if (value < min) min = value;
-      if (value > max) max = value;
-      sum += value;
-    }
-    
-    const avg = sum / validValues.length;
-    return { min, max, avg };
-  };
-
   return (
     <Card className="border-primary/20">
       <CardHeader>
@@ -80,9 +59,9 @@ export const ProfileChart: React.FC<ProfileChartProps> = ({ data, spec }) => {
                 <h3 className="font-semibold text-lg">Float {groupKey}</h3>
               )}
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 {x_opts.filter(param => param && typeof param === 'string').map((param) => {
-                  // Filter and validate data more carefully
+                  // Filter and validate data
                   const validData = (groupData as any[]).filter(d => 
                     d && 
                     typeof d === 'object' && 
@@ -90,66 +69,63 @@ export const ProfileChart: React.FC<ProfileChartProps> = ({ data, spec }) => {
                     d[y] != null &&
                     !isNaN(parseFloat(d[param])) &&
                     !isNaN(parseFloat(d[y]))
-                  );
+                  ).map(d => ({
+                    [param]: parseFloat(d[param]),
+                    [y]: parseFloat(d[y])
+                  })).sort((a, b) => a[y] - b[y]); // Sort by pressure/depth
                   
-                  const values = validData.map(d => parseFloat(d[param]));
-                  const pressureValues = validData.map(d => parseFloat(d[y]));
+                  if (validData.length === 0) return null;
                   
-                  if (values.length === 0) return null;
-                  
-                  const stats = getStats(values);
-                  const depthRange = getStats(pressureValues);
+                  const getUnit = (parameter: string) => {
+                    switch (parameter) {
+                      case 'temperature': return '°C';
+                      case 'salinity': return 'psu';
+                      case 'pressure': return 'dbar';
+                      default: return '';
+                    }
+                  };
                   
                   return (
                     <div key={`${groupKey}-${param}`} className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-medium capitalize">{param}</h4>
+                        <h4 className="font-medium capitalize">
+                          {param} vs {y} Profile
+                        </h4>
                         <Badge variant="secondary" className="text-xs">
-                          {values.length} points
+                          {validData.length} measurements
                         </Badge>
                       </div>
                       
-                      <div className="bg-gradient-to-b from-accent/5 to-primary/5 rounded-lg p-4 min-h-[200px] relative overflow-hidden">
-                        {/* Simulated profile visualization */}
-                        <div className="absolute inset-4 border-l-2 border-b-2 border-muted-foreground/20">
-                          <div className="absolute -bottom-6 -left-4 text-xs text-muted-foreground">
-                            {y === 'pressure' ? `${depthRange.max.toFixed(0)} dbar` : '0'}
-                          </div>
-                          <div className="absolute -top-4 -left-4 text-xs text-muted-foreground">
-                            {y === 'pressure' ? `${depthRange.min.toFixed(0)} dbar` : `${depthRange.max.toFixed(1)}`}
-                          </div>
-                          <div className="absolute -bottom-6 -right-4 text-xs text-muted-foreground">
-                            {stats.max.toFixed(1)} {param === 'temperature' ? '°C' : 'psu'}
-                          </div>
-                          <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs text-muted-foreground">
-                            {stats.avg.toFixed(1)}
-                          </div>
-                        </div>
-                        
-                        {/* Profile curve simulation */}
-                        <div className="absolute inset-4 flex items-end">
-                          <div className="w-full h-full relative">
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/20 to-transparent rounded-full blur-sm"></div>
-                            <div className="absolute left-1/4 bottom-0 w-px h-3/4 bg-primary/40"></div>
-                            <div className="absolute left-1/2 bottom-0 w-px h-4/5 bg-primary/60"></div>
-                            <div className="absolute left-3/4 bottom-0 w-px h-2/3 bg-primary/40"></div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-2 text-sm">
-                        <div className="text-center p-2 bg-success/5 rounded border border-success/20">
-                          <div className="font-medium text-success">Min</div>
-                          <div className="text-xs">{stats.min.toFixed(2)}</div>
-                        </div>
-                        <div className="text-center p-2 bg-primary/5 rounded border border-primary/20">
-                          <div className="font-medium text-primary">Avg</div>
-                          <div className="text-xs">{stats.avg.toFixed(2)}</div>
-                        </div>
-                        <div className="text-center p-2 bg-warning/5 rounded border border-warning/20">
-                          <div className="font-medium text-warning">Max</div>
-                          <div className="text-xs">{stats.max.toFixed(2)}</div>
-                        </div>
+                      <div className="bg-background rounded-lg p-4 border">
+                        <ResponsiveContainer width="100%" height={400}>
+                          <LineChart data={validData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis 
+                              type="number"
+                              dataKey={param}
+                              domain={['dataMin', 'dataMax']}
+                              label={{ value: `${param} (${getUnit(param)})`, position: 'insideBottom', offset: -5 }}
+                            />
+                            <YAxis 
+                              type="number"
+                              dataKey={y}
+                              domain={['dataMin', 'dataMax']}
+                              reversed={invert_y}
+                              label={{ value: `${y} (${getUnit(y)})`, angle: -90, position: 'insideLeft' }}
+                            />
+                            <Tooltip 
+                              formatter={(value, name) => [`${typeof value === 'number' ? value.toFixed(2) : value} ${getUnit(name.toString())}`, name]}
+                              labelFormatter={(label) => `${y}: ${label} ${getUnit(y)}`}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey={param} 
+                              stroke="hsl(var(--primary))" 
+                              strokeWidth={2}
+                              dot={{ fill: 'hsl(var(--primary))', strokeWidth: 1, r: 3 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
                   );

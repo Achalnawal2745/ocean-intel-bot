@@ -2,6 +2,7 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Calendar } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface TimeseriesChartProps {
   data: any[];
@@ -14,7 +15,14 @@ interface TimeseriesChartProps {
 export const TimeseriesChart: React.FC<TimeseriesChartProps> = ({ data, spec }) => {
   const { x, y } = spec;
   
-  const validData = data.filter(d => d[x] && d[y] != null);
+  // Process and validate data
+  const validData = data.filter(d => d[x] && d[y] != null && !isNaN(parseFloat(d[y])))
+    .map(d => ({
+      timestamp: new Date(d[x]).getTime(),
+      [y]: parseFloat(d[y]),
+      date: new Date(d[x]).toLocaleDateString()
+    }))
+    .sort((a, b) => a.timestamp - b.timestamp);
   
   if (validData.length === 0) {
     return (
@@ -26,13 +34,13 @@ export const TimeseriesChart: React.FC<TimeseriesChartProps> = ({ data, spec }) 
     );
   }
 
-  const values = validData.map(d => parseFloat(d[y]));
+  const values = validData.map(d => parseFloat(d[y] as string));
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
   const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
   
-  const firstDate = new Date(validData[0][x]);
-  const lastDate = new Date(validData[validData.length - 1][x]);
+  const firstDate = new Date(validData[0].timestamp);
+  const lastDate = new Date(validData[validData.length - 1].timestamp);
   const duration = Math.abs(lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24);
 
   const getUnit = (param: string) => {
@@ -42,6 +50,10 @@ export const TimeseriesChart: React.FC<TimeseriesChartProps> = ({ data, spec }) 
       case 'pressure': return 'dbar';
       default: return '';
     }
+  };
+
+  const formatDate = (tickItem: number) => {
+    return new Date(tickItem).toLocaleDateString();
   };
 
   return (
@@ -78,59 +90,36 @@ export const TimeseriesChart: React.FC<TimeseriesChartProps> = ({ data, spec }) 
             </div>
           </div>
 
-          {/* Simulated Chart Area */}
-          <div className="bg-gradient-to-br from-success/5 to-accent/5 rounded-lg p-6 min-h-[300px] relative overflow-hidden">
-            <div className="absolute inset-4 border-l-2 border-b-2 border-muted-foreground/20">
-              {/* Y-axis labels */}
-              <div className="absolute -left-12 top-0 text-xs text-muted-foreground">
-                {maxValue.toFixed(1)}
-              </div>
-              <div className="absolute -left-12 top-1/2 text-xs text-muted-foreground">
-                {avgValue.toFixed(1)}
-              </div>
-              <div className="absolute -left-12 bottom-0 text-xs text-muted-foreground">
-                {minValue.toFixed(1)}
-              </div>
-              
-              {/* X-axis labels */}
-              <div className="absolute -bottom-8 left-0 text-xs text-muted-foreground">
-                {firstDate.toLocaleDateString()}
-              </div>
-              <div className="absolute -bottom-8 right-0 text-xs text-muted-foreground">
-                {lastDate.toLocaleDateString()}
-              </div>
-            </div>
-            
-            {/* Simulated timeseries line */}
-            <div className="absolute inset-4 flex items-end">
-              <div className="w-full h-full relative">
-                {/* Background grid */}
-                <div className="absolute inset-0 opacity-10">
-                  <div className="h-full w-full bg-gradient-to-r from-transparent via-muted-foreground to-transparent"></div>
-                </div>
-                
-                {/* Data visualization simulation */}
-                <div className="absolute inset-0 flex items-end space-x-1">
-                  {Array.from({ length: 20 }, (_, i) => {
-                    const height = 20 + Math.sin(i * 0.5) * 30 + Math.random() * 20;
-                    return (
-                      <div 
-                        key={i}
-                        className="flex-1 bg-gradient-to-t from-success to-accent rounded-t opacity-60"
-                        style={{ height: `${height}%` }}
-                      />
-                    );
-                  })}
-                </div>
-                
-                {/* Trend line */}
-                <div className="absolute inset-0 bg-gradient-to-r from-success/30 via-primary/30 to-accent/30 rounded-full blur-lg opacity-50"></div>
-              </div>
-            </div>
-            
-            <div className="absolute top-4 right-4 text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
-              Interactive chart would be rendered here
-            </div>
+          {/* Interactive Chart */}
+          <div className="bg-background rounded-lg p-4 border">
+            <ResponsiveContainer width="100%" height={400}>
+              <LineChart data={validData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  type="number"
+                  scale="time"
+                  dataKey="timestamp"
+                  domain={['dataMin', 'dataMax']}
+                  tickFormatter={formatDate}
+                  label={{ value: 'Time', position: 'insideBottom', offset: -5 }}
+                />
+                <YAxis 
+                  domain={['dataMin', 'dataMax']}
+                  label={{ value: `${y} (${getUnit(y)})`, angle: -90, position: 'insideLeft' }}
+                />
+                <Tooltip 
+                  formatter={(value) => [`${typeof value === 'number' ? value.toFixed(2) : value} ${getUnit(y)}`, y]}
+                  labelFormatter={(label) => `Date: ${new Date(label).toLocaleString()}`}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey={y} 
+                  stroke="hsl(var(--success))" 
+                  strokeWidth={2}
+                  dot={{ fill: 'hsl(var(--success))', strokeWidth: 1, r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
 
           {/* Date Range Info */}
