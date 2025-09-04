@@ -1,9 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Map } from "lucide-react";
+import { Map as MapIcon } from "lucide-react";
 
 // Fix Leaflet default marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -52,7 +51,7 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
       <Card className="border-warning/20">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Map className="h-5 w-5 text-warning" />
+            <MapIcon className="h-5 w-5 text-warning" />
             <span>Float Path Visualization</span>
           </CardTitle>
         </CardHeader>
@@ -87,72 +86,74 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
     shadowSize: [41, 41]
   });
 
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const vectorsRef = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
-    if (mapRef.current && bounds) {
-      mapRef.current.fitBounds(bounds as any, { padding: [50, 50] });
+    if (!containerRef.current) return;
+
+    // Initialize map once
+    if (!mapRef.current) {
+      mapRef.current = L.map(containerRef.current, {
+        center: [0, 0],
+        zoom: 2,
+        worldCopyJump: true,
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+      }).addTo(mapRef.current);
+      vectorsRef.current = L.layerGroup().addTo(mapRef.current);
+    }
+
+    // Update vector layers
+    const v = vectorsRef.current!;
+    v.clearLayers();
+
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    const routeColor = accent ? `hsl(${accent})` : '#3b82f6';
+
+    const poly = L.polyline(pathCoordinates, { color: routeColor, weight: 3, opacity: 0.7 }).addTo(v);
+
+    if (start) {
+      L.marker([start.lat, start.lon], { icon: startIcon })
+        .addTo(v)
+        .bindPopup(`<strong>Start</strong><br/>Lat: ${start.lat.toFixed(4)}<br/>Lon: ${start.lon.toFixed(4)}`);
+    }
+    if (end) {
+      L.marker([end.lat, end.lon], { icon: endIcon })
+        .addTo(v)
+        .bindPopup(`<strong>End</strong><br/>Lat: ${end.lat.toFixed(4)}<br/>Lon: ${end.lon.toFixed(4)}`);
+    }
+
+    if (bounds) {
+      mapRef.current!.fitBounds(poly.getBounds(), { padding: [50, 50] });
     }
   }, [boundsKey]);
+
+  useEffect(() => {
+    return () => {
+      mapRef.current?.remove();
+      mapRef.current = null;
+      vectorsRef.current = null;
+    };
+  }, []);
 
   return (
     <Card className="border-accent/20">
       <CardHeader>
         <CardTitle className="flex items-center space-x-2">
-          <Map className="h-5 w-5 text-accent" />
+          <MapIcon className="h-5 w-5 text-accent" />
           <span>Float Path Visualization</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="relative">
-          <MapContainer 
-            key={boundsKey || 'default'}
-            center={[0, 0]} 
-            zoom={2} 
-            ref={mapRef as any}
+          <div 
+            ref={containerRef}
             className="w-full h-[400px] rounded-lg shadow-lg z-0"
             style={{ minHeight: '400px' }}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            
-            {/* Float path */}
-            <Polyline 
-              positions={pathCoordinates} 
-              color="#3b82f6" 
-              weight={3}
-              opacity={0.7}
-            />
-            
-            {/* Start marker */}
-            {start && (
-              <Marker position={[start.lat, start.lon]} icon={startIcon}>
-                <Popup>
-                  <div>
-                    <strong>Start Position</strong><br/>
-                    Lat: {start.lat.toFixed(4)}°<br/>
-                    Lon: {start.lon.toFixed(4)}°
-                  </div>
-                </Popup>
-              </Marker>
-            )}
-            
-            {/* End marker */}
-            {end && (
-              <Marker position={[end.lat, end.lon]} icon={endIcon}>
-                <Popup>
-                  <div>
-                    <strong>End Position</strong><br/>
-                    Lat: {end.lat.toFixed(4)}°<br/>
-                    Lon: {end.lon.toFixed(4)}°
-                  </div>
-                </Popup>
-              </Marker>
-            )}
-             
-          </MapContainer>
+          />
           
           {/* Path stats overlay */}
           <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm rounded-lg border p-3 shadow-lg z-10">
