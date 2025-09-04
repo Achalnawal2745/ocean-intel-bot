@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -42,6 +42,7 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
     zoom = 6;
   }
 
+  const boundsKey = bounds ? `${bounds[0][0]}:${bounds[0][1]}:${bounds[1][0]}:${bounds[1][1]}` : '';
   if (!line || line.length === 0) {
     return (
       <Card className="border-warning/20">
@@ -82,12 +83,16 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
     shadowSize: [41, 41]
   });
 
-  // Fit map to bounds once when available
-  const FitBounds: React.FC<{ bounds: [[number, number], [number, number]] }> = ({ bounds }) => {
+  // Fit map to bounds once when available (guarded by depsKey)
+  const FitBounds: React.FC<{ bounds: [[number, number], [number, number]]; depsKey: string }> = ({ bounds, depsKey }) => {
     const map = useMap();
+    const lastKeyRef = useRef<string | null>(null);
     useEffect(() => {
-      map.fitBounds(bounds as any, { padding: [50, 50] });
-    }, [map, bounds]);
+      if (depsKey && lastKeyRef.current !== depsKey) {
+        map.fitBounds(bounds as any, { padding: [50, 50] });
+        lastKeyRef.current = depsKey;
+      }
+    }, [map, depsKey]);
     return null;
   };
 
@@ -102,8 +107,8 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
       <CardContent>
         <div className="relative">
           <MapContainer 
-            center={center} 
-            zoom={zoom} 
+            center={[0, 0]} 
+            zoom={2} 
             className="w-full h-[400px] rounded-lg shadow-lg z-0"
             style={{ minHeight: '400px' }}
           >
@@ -145,7 +150,7 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
                 </Popup>
               </Marker>
             )}
-            {bounds && <FitBounds bounds={bounds} />} 
+            {bounds && <FitBounds bounds={bounds} depsKey={boundsKey} />} 
           </MapContainer>
           
           {/* Path stats overlay */}
