@@ -15,8 +15,12 @@ interface ProfileChartProps {
 }
 
 export const ProfileChart: React.FC<ProfileChartProps> = ({ data, spec }) => {
+  console.log('ProfileChart received data:', data?.length, 'items');
+  console.log('ProfileChart received spec:', spec);
+  
   // Early return for invalid data
   if (!data || !Array.isArray(data) || data.length === 0) {
+    console.log('ProfileChart: No valid data provided');
     return (
       <Card className="border-warning/20">
         <CardContent className="p-6 text-center text-muted-foreground">
@@ -74,7 +78,11 @@ export const ProfileChart: React.FC<ProfileChartProps> = ({ data, spec }) => {
                     [y]: parseFloat(d[y])
                   })).sort((a, b) => a[y] - b[y]); // Sort by pressure/depth
                   
-                  if (validData.length === 0) return null;
+                  console.log(`ProfileChart: ${param} vs ${y} - filtered data:`, validData.length, 'points');
+                  if (validData.length === 0) {
+                    console.log(`ProfileChart: No valid data for ${param} vs ${y}`);
+                    return null;
+                  }
                   
                   const getUnit = (parameter: string) => {
                     switch (parameter) {
