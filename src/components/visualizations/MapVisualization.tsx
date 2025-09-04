@@ -30,12 +30,16 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
   let zoom = 2;
   
   if (line && line.length > 0) {
-    const lngs = line.map(point => point.lon);
-    const lats = line.map(point => point.lat);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
+    let minLng = line[0].lon;
+    let maxLng = line[0].lon;
+    let minLat = line[0].lat;
+    let maxLat = line[0].lat;
+    for (const p of line) {
+      if (p.lon < minLng) minLng = p.lon;
+      if (p.lon > maxLng) maxLng = p.lon;
+      if (p.lat < minLat) minLat = p.lat;
+      if (p.lat > maxLat) maxLat = p.lat;
+    }
     
     bounds = [[minLat, minLng], [maxLat, maxLng]];
     center = [(minLat + maxLat) / 2, (minLng + maxLng) / 2];
