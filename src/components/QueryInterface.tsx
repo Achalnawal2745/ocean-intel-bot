@@ -10,11 +10,13 @@ import { buildApiUrl, API_CONFIG } from "@/config/api";
 interface QueryInterfaceProps {
   onQueryResult: (result: any) => void;
   sessionId: string;
+  connected?: boolean;
 }
 
-export const QueryInterface: React.FC<QueryInterfaceProps> = ({ 
-  onQueryResult, 
-  sessionId 
+export const QueryInterface: React.FC<QueryInterfaceProps> = ({
+  onQueryResult,
+  sessionId,
+  connected = true,
 }) => {
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -96,11 +98,11 @@ export const QueryInterface: React.FC<QueryInterfaceProps> = ({
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Ask about ARGO floats... e.g., 'Show temperature data for float 2902094'"
               className="flex-1 text-base"
-              disabled={isLoading}
+              disabled={isLoading || !connected}
             />
-            <Button 
-              type="submit" 
-              disabled={!query.trim() || isLoading}
+            <Button
+              type="submit"
+              disabled={!query.trim() || isLoading || !connected}
               className="ocean-gradient hover:shadow-glow transition-smooth"
             >
               {isLoading ? (
@@ -115,6 +117,11 @@ export const QueryInterface: React.FC<QueryInterfaceProps> = ({
             <h3 className="text-sm font-medium text-muted-foreground">
               Suggested Queries:
             </h3>
+            {!connected && (
+              <div className="text-xs text-destructive">
+                Backend disconnected. Queries are disabled until connection is restored.
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {suggestions.map((suggestion, index) => (
                 <Badge

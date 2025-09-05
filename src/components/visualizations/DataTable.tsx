@@ -91,6 +91,26 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
     }
   };
 
+  const exportCsv = () => {
+    const rows = filteredData;
+    const header = columns.join(",");
+    const escape = (val: any) => {
+      if (val == null) return "";
+      const s = String(val).replace(/"/g, '""');
+      return /[",\n]/.test(s) ? `"${s}"` : s;
+    };
+    const body = rows.map((row) => columns.map((c) => escape(row[c])).join(",")).join("\n");
+    const csv = header + "\n" + body;
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `data_export_${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -103,7 +123,7 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
             </Badge>
           </CardTitle>
           <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={exportCsv}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
