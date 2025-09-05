@@ -6,6 +6,7 @@ import { ProfileChart } from "./visualizations/ProfileChart";
 import { TimeseriesChart } from "./visualizations/TimeseriesChart";
 import { DataTable } from "./visualizations/DataTable";
 import { TrendingUp, Map, BarChart3, Database } from "lucide-react";
+import { buildApiUrl } from "@/config/api";
 
 interface DataVisualizationProps {
   result: any;
@@ -76,7 +77,18 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
             {result.viz.kind === "profile" && (
               <ProfileChart data={result.data} spec={result.viz.spec} />
             )}
-            {result.viz.kind === "timeseries" && (
+            {result.viz.kind === "profile_comparison" && (
+              <ProfileChart
+                data={result.data}
+                spec={{
+                  y: result.viz.spec.y,
+                  x_opts: [result.viz.spec.x],
+                  invert_y: result.viz.spec.invert_y,
+                  group_by: result.viz.spec.group_by,
+                }}
+              />
+            )}
+            {(result.viz.kind === "timeseries" || result.viz.kind === "temporal") && (
               <TimeseriesChart data={result.data} spec={result.viz.spec} />
             )}
           </div>
@@ -111,15 +123,19 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
           <div className="space-y-3">
             <h3 className="text-lg font-semibold">Export Data</h3>
             <div className="flex flex-wrap gap-2">
-              {Object.entries(result.export_options).map(([format, url]) => (
-                <Badge
-                  key={format}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-smooth"
-                >
-                  {format.toUpperCase()}
-                </Badge>
-              ))}
+              {Object.entries(result.export_options).map(([format, url]) => {
+                const href = typeof url === 'string' ? buildApiUrl(url) : '#';
+                return (
+                  <a key={format} href={href} target="_blank" rel="noreferrer">
+                    <Badge
+                      variant="outline"
+                      className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-smooth"
+                    >
+                      {format.toUpperCase()}
+                    </Badge>
+                  </a>
+                );
+              })}
             </div>
           </div>
         )}
