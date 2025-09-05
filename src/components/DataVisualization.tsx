@@ -26,6 +26,23 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
   const [profileParam, setProfileParam] = useState<string | undefined>(undefined);
   const [invertY, setInvertY] = useState<boolean | undefined>(undefined);
 
+  // Compute timeseries bounds
+  const tsBounds = useMemo(() => {
+    if (!result?.viz || !(result.viz.kind === 'timeseries' || result.viz.kind === 'temporal')) return null as null | { min: Date; max: Date; minStr: string; maxStr: string };
+    const xKey = result.viz.spec?.x || 'timestamp';
+    let min = new Date(8640000000000000);
+    let max = new Date(-8640000000000000);
+    for (const d of Array.isArray(result.data) ? result.data : []) {
+      const t = new Date(d?.[xKey]);
+      if (t.toString() === 'Invalid Date') continue;
+      if (t < min) min = t;
+      if (t > max) max = t;
+    }
+    if (max < min) return null;
+    const toStr = (dt: Date) => dt.toISOString().slice(0, 10);
+    return { min, max, minStr: toStr(min), maxStr: toStr(max) };
+  }, [result]);
+
   // Initialize/refresh filters when result changes
   useEffect(() => {
     if (!result?.viz) return;
@@ -35,10 +52,15 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
       setInvertY(result.viz.spec?.invert_y ?? false);
     }
     if (result.viz.kind === "timeseries" || result.viz.kind === "temporal") {
-      setTsStart("");
-      setTsEnd("");
+      if (tsBounds) {
+        setTsStart(tsBounds.minStr);
+        setTsEnd(tsBounds.maxStr);
+      } else {
+        setTsStart("");
+        setTsEnd("");
+      }
     }
-  }, [result]);
+  }, [result, tsBounds]);
 
   const handleExport = async (format: string, endpoint: string | unknown) => {
     try {
@@ -184,14 +206,14 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                 <div>
                   <Label htmlFor="ts-start">Start date</Label>
-                  <Input id="ts-start" type="date" value={tsStart} onChange={(e) => setTsStart(e.target.value)} />
+                  <Input id="ts-start" type="date" value={tsStart} min={tsBounds?.minStr} max={tsBounds?.maxStr} onChange={(e) => setTsStart(e.target.value)} />
                 </div>
                 <div>
                   <Label htmlFor="ts-end">End date</Label>
-                  <Input id="ts-end" type="date" value={tsEnd} onChange={(e) => setTsEnd(e.target.value)} />
+                  <Input id="ts-end" type="date" value={tsEnd} min={tsBounds?.minStr} max={tsBounds?.maxStr} onChange={(e) => setTsEnd(e.target.value)} />
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  Filter the displayed timeseries by date range. Exports remain unaffected.
+                  Range: {tsBounds ? `${tsBounds.minStr} to ${tsBounds.maxStr}` : 'n/a'}. Filters update the graph instantly.
                 </div>
               </div>
             )}
