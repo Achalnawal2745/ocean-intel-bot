@@ -30,12 +30,26 @@ const computeMapState = (
     };
   }
 
-  const lats = coords.map((p) => p.lat);
-  const lons = coords.map((p) => p.lon);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLon = Math.min(...lons);
-  const maxLon = Math.max(...lons);
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLon = Infinity;
+  let maxLon = -Infinity;
+  for (const p of coords) {
+    const lat = Number(p.lat);
+    const lon = Number(p.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lon < minLon) minLon = lon;
+    if (lon > maxLon) maxLon = lon;
+  }
+  if (!Number.isFinite(minLat) || !Number.isFinite(minLon) || !Number.isFinite(maxLat) || !Number.isFinite(maxLon)) {
+    return {
+      center: [0, 0] as [number, number],
+      zoom: 2,
+      bounds: undefined as LatLngBoundsExpression | undefined,
+    };
+  }
   const center: [number, number] = [(minLat + maxLat) / 2, (minLon + maxLon) / 2];
   const bounds: LatLngBoundsExpression = [
     [minLat, minLon],
