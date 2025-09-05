@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapVisualization } from "./visualizations/MapVisualization";
@@ -8,6 +8,10 @@ import { DataTable } from "./visualizations/DataTable";
 import { TrendingUp, Map, BarChart3, Database } from "lucide-react";
 import { buildApiUrl } from "@/config/api";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 interface DataVisualizationProps {
   result: any;
@@ -15,6 +19,26 @@ interface DataVisualizationProps {
 
 export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) => {
   const { toast } = useToast();
+
+  // Filters state
+  const [tsStart, setTsStart] = useState<string>("");
+  const [tsEnd, setTsEnd] = useState<string>("");
+  const [profileParam, setProfileParam] = useState<string | undefined>(undefined);
+  const [invertY, setInvertY] = useState<boolean | undefined>(undefined);
+
+  // Initialize/refresh filters when result changes
+  useEffect(() => {
+    if (!result?.viz) return;
+    if (result.viz.kind === "profile" || result.viz.kind === "profile_comparison") {
+      const xOpts: string[] = result.viz.spec?.x_opts || (result.viz.spec?.x ? [result.viz.spec.x] : []);
+      setProfileParam(result.viz.spec?.x || xOpts[0]);
+      setInvertY(result.viz.spec?.invert_y ?? false);
+    }
+    if (result.viz.kind === "timeseries" || result.viz.kind === "temporal") {
+      setTsStart("");
+      setTsEnd("");
+    }
+  }, [result]);
 
   const handleExport = async (format: string, endpoint: string | unknown) => {
     try {
@@ -56,6 +80,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
       toast({ title: 'Export failed', description: e?.message || 'Unable to download', variant: 'destructive' });
     }
   };
+
   const getIntentIcon = (intent: string) => {
     switch (intent) {
       case "profile_path":
@@ -81,6 +106,47 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
         return "bg-secondary/10 text-secondary-foreground border-secondary/20";
     }
   };
+
+  // Build filtered data depending on visualization kind
+  const filteredData = useMemo(() => {
+    if (!result?.data || !Array.isArray(result.data)) return [] as any[];
+
+    if (result.viz?.kind === "timeseries" || result.viz?.kind === "temporal") {
+      const xKey = result.viz.spec?.x || 'timestamp';
+      const start = tsStart ? new Date(tsStart) : null;
+      const end = tsEnd ? new Date(tsEnd) : null;
+      return result.data.filter((d: any) => {
+        const t = new Date(d[xKey]);
+        if (t.toString() === 'Invalid Date') return false;
+        if (start && t < start) return false;
+        if (end) {
+          const endOfDay = new Date(end);
+          endOfDay.setHours(23,59,59,999);
+          if (t > endOfDay) return false;
+        }
+        return true;
+      });
+    }
+
+    if (result.viz?.kind === "profile" || result.viz?.kind === "profile_comparison") {
+      return result.data;
+    }
+
+    return result.data;
+  }, [result, tsStart, tsEnd]);
+
+  // Build spec overrides for profile charts
+  const profileSpec = useMemo(() => {
+    if (!result?.viz || (result.viz.kind !== 'profile' && result.viz.kind !== 'profile_comparison')) return undefined;
+    const base = result.viz.spec || {};
+    const xOpts: string[] = base.x_opts || (base.x ? [base.x] : []);
+    return {
+      ...base,
+      x_opts: xOpts,
+      x: profileParam || base.x || xOpts[0],
+      invert_y: invertY ?? base.invert_y,
+    } as any;
+  }, [result, profileParam, invertY]);
 
   return (
     <Card className="shadow-depth">
@@ -111,35 +177,81 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
           )}
         </div>
 
+        {/* Filters */}
+        {result.viz && (
+          <div className="p-4 rounded-lg border bg-muted/5 space-y-3">
+            {(result.viz.kind === 'timeseries' || result.viz.kind === 'temporal') && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div>
+                  <Label htmlFor="ts-start">Start date</Label>
+                  <Input id="ts-start" type="date" value={tsStart} onChange={(e) => setTsStart(e.target.value)} />
+                </div>
+                <div>
+                  <Label htmlFor="ts-end">End date</Label>
+                  <Input id="ts-end" type="date" value={tsEnd} onChange={(e) => setTsEnd(e.target.value)} />
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Filter the displayed timeseries by date range. Exports remain unaffected.
+                </div>
+              </div>
+            )}
+
+            {(result.viz.kind === 'profile' || result.viz.kind === 'profile_comparison') && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div>
+                  <Label>Parameter</Label>
+                  <Select value={profileParam} onValueChange={setProfileParam}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select parameter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(result.viz.spec?.x_opts || (result.viz.spec?.x ? [result.viz.spec.x] : [])).map((opt: string) => (
+                        <SelectItem key={opt} value={opt} className="capitalize">{opt}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center space-x-3 pt-6">
+                  <Switch id="invert-y" checked={!!invertY} onCheckedChange={setInvertY} />
+                  <Label htmlFor="invert-y">Invert depth (show depth increasing downward)</Label>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Choose x-axis parameter and depth orientation for profile charts.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Visualizations */}
         {result.viz && (
           <div className="space-y-4">
             {result.viz.kind === "map" && (
               <MapVisualization data={result.viz.spec} />
             )}
-            {result.viz.kind === "profile" && (
-              <ProfileChart data={result.data} spec={result.viz.spec} />
+            {result.viz.kind === "profile" && profileSpec && (
+              <ProfileChart data={filteredData} spec={profileSpec} />
             )}
-            {result.viz.kind === "profile_comparison" && (
+            {result.viz.kind === "profile_comparison" && profileSpec && (
               <ProfileChart
-                data={result.data}
+                data={filteredData}
                 spec={{
-                  y: result.viz.spec.y,
-                  x_opts: [result.viz.spec.x],
-                  invert_y: result.viz.spec.invert_y,
-                  group_by: result.viz.spec.group_by,
+                  y: profileSpec.y,
+                  x_opts: [profileSpec.x],
+                  invert_y: profileSpec.invert_y,
+                  group_by: profileSpec.group_by,
                 }}
               />
             )}
             {(result.viz.kind === "timeseries" || result.viz.kind === "temporal") && (
-              <TimeseriesChart data={result.data} spec={result.viz.spec} />
+              <TimeseriesChart data={filteredData} spec={result.viz.spec} />
             )}
           </div>
         )}
 
         {/* Data Table */}
-        {result.data && Array.isArray(result.data) && result.data.length > 0 && (
-          <DataTable data={result.data} />
+        {filteredData && Array.isArray(filteredData) && filteredData.length > 0 && (
+          <DataTable data={filteredData} />
         )}
 
         {/* Semantic Search Results */}
