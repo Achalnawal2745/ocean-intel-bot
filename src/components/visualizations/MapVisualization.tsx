@@ -8,13 +8,21 @@ import 'leaflet/dist/leaflet.css';
 interface MapVisualizationProps {
   data: {
     line?: { lat: number; lon: number }[];
+    points?: { lat: number; lon: number; float_id?: number }[];
     start?: { lat: number; lon: number };
     end?: { lat: number; lon: number };
   };
 }
 
-const computeMapState = (line?: { lat: number; lon: number }[]) => {
-  if (!line || line.length === 0) {
+const computeMapState = (
+  line?: { lat: number; lon: number }[],
+  points?: { lat: number; lon: number }[]
+) => {
+  const coords = [
+    ...(line ?? []),
+    ...(points ?? [])
+  ];
+  if (coords.length === 0) {
     return {
       center: [0, 0] as [number, number],
       zoom: 2,
@@ -22,8 +30,8 @@ const computeMapState = (line?: { lat: number; lon: number }[]) => {
     };
   }
 
-  const lats = line.map((p) => p.lat);
-  const lons = line.map((p) => p.lon);
+  const lats = coords.map((p) => p.lat);
+  const lons = coords.map((p) => p.lon);
   const minLat = Math.min(...lats);
   const maxLat = Math.max(...lats);
   const minLon = Math.min(...lons);
@@ -42,9 +50,9 @@ const WhenReadyFitBounds: React.FC<{ bounds?: LatLngBoundsExpression }>
   = ({ bounds }) => null; // handled via MapContainer 'bounds' prop in react-leaflet v4
 
 export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
-  const { line, start, end } = data;
+  const { line, points, start, end } = data;
 
-  const mapState = useMemo(() => computeMapState(line), [line]);
+  const mapState = useMemo(() => computeMapState(line, points), [line, points]);
   const pathCoords: LatLngExpression[] = useMemo(
     () => (line ? line.map((p) => [p.lat, p.lon]) : []),
     [line]
@@ -108,10 +116,27 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
               </CircleMarker>
             )}
 
+            {points && points.map((pt, idx) => (
+              <CircleMarker
+                key={`${pt.lat}-${pt.lon}-${idx}`}
+                center={[pt.lat, pt.lon]}
+                radius={5}
+                pathOptions={{ color: 'hsl(var(--primary))', fillColor: 'hsl(var(--primary))', fillOpacity: 0.9 }}
+              >
+                <Popup>
+                  <div className="text-sm">
+                    {pt.float_id ? (<div><strong>Float</strong>: {pt.float_id}</div>) : null}
+                    <div>Lat: {pt.lat.toFixed(4)}</div>
+                    <div>Lon: {pt.lon.toFixed(4)}</div>
+                  </div>
+                </Popup>
+              </CircleMarker>
+            ))}
+
             <WhenReadyFitBounds bounds={mapState.bounds} />
           </MapContainer>
 
-          {line && line.length > 0 && (
+          {(line && line.length > 0) && (
             <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm rounded-lg border p-3 shadow-lg">
               <div className="text-sm space-y-1">
                 <div className="font-semibold">{line.length} waypoints</div>
@@ -127,6 +152,14 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
                     </div>
                   </>
                 )}
+              </div>
+            </div>
+          )}
+
+          {points && points.length > 0 && (
+            <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm rounded-lg border p-3 shadow-lg">
+              <div className="text-sm space-y-1">
+                <div className="font-semibold">{points.length} positions</div>
               </div>
             </div>
           )}
