@@ -170,6 +170,27 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
     } as any;
   }, [result, profileParam, invertY]);
 
+  // Derive map points from result.data when available
+  const derivedMapSpec = useMemo(() => {
+    const rows = Array.isArray(result?.data) ? result.data : [];
+    if (!rows.length) return null as null | { points: any[] };
+    const firstObj = rows.find((r: any) => r && typeof r === 'object');
+    if (!firstObj) return null as null | { points: any[] };
+    const keys = Object.keys(firstObj);
+    const latKey = keys.find((k) => /lat/i.test(k));
+    const lonKey = keys.find((k) => /lon|lng|longitude/i.test(k));
+    if (!latKey || !lonKey) return null as null | { points: any[] };
+    const toNum = (v: any) => {
+      if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+      if (typeof v === 'string') { const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
+      return null;
+    };
+    const points = rows
+      .map((r: any) => ({ lat: toNum(r?.[latKey]), lon: toNum(r?.[lonKey]), float_id: r?.float_id || r?.id }))
+      .filter((p: any) => p.lat !== null && p.lon !== null);
+    return points.length ? { points } : null;
+  }, [result]);
+
   return (
     <Card className="shadow-depth">
       <CardHeader>
@@ -249,24 +270,12 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
         {/* Visualizations */}
         {result.viz && (
           <div className="space-y-4">
-            {result.viz.kind === "map" && (
+            {(result.viz?.kind === "map" || derivedMapSpec) && (
               <MapVisualization data={(function(){
-                const base = result.viz.spec || {};
+                const base = (result.viz?.spec as any) || {};
                 if (Array.isArray(base.points) && base.points.length) return base;
-                const rows = Array.isArray(result.data) ? result.data : [];
-                if (!rows.length) return base;
-                const first = rows.find((r: any) => r && typeof r === 'object') || {};
-                const keys = Object.keys(first);
-                const latKey = keys.find((k) => /lat/i.test(k));
-                const lonKey = keys.find((k) => /lon|lng|longitude/i.test(k));
-                if (!latKey || !lonKey) return base;
-                const toNum = (v: any) => {
-                  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
-                  if (typeof v === 'string') { const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
-                  return null;
-                };
-                const points = rows.map((r: any) => ({ lat: toNum(r?.[latKey]), lon: toNum(r?.[lonKey]), float_id: r?.float_id || r?.id })).filter((p: any) => p.lat !== null && p.lon !== null);
-                return { ...base, points };
+                if (derivedMapSpec?.points?.length) return { ...base, points: derivedMapSpec.points };
+                return base;
               })()} />
             )}
             {result.viz.kind === "profile" && profileSpec && (
