@@ -298,9 +298,10 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
             {(result.viz?.kind === "map" || derivedMapSpec) && (
               <MapVisualization data={(function(){
                 const base = (result.viz?.spec as any) || {};
-                if (Array.isArray(base.points) && base.points.length) return base;
-                if (derivedMapSpec?.points?.length) return { ...base, points: derivedMapSpec.points };
-                return base;
+                const withRows = { ...base, rows: Array.isArray(result.data) ? result.data : [] };
+                if (Array.isArray(base.points) && base.points.length) return withRows;
+                if (derivedMapSpec?.points?.length) return { ...withRows, points: derivedMapSpec.points };
+                return withRows;
               })()} />
             )}
             {result.viz?.kind === "profile" && profileSpec && (
