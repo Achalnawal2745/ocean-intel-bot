@@ -68,20 +68,32 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
   const { line, points, start, end } = data;
 
   const toNum = (v: any) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    if (typeof v === 'string') {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
   };
 
   const safeLine = useMemo(
     () => (line ?? [])
-      .map((p) => ({ lat: toNum(p.lat), lon: toNum(p.lon) }))
+      .map((p: any) => {
+        const lat = toNum(p?.lat ?? (Array.isArray(p) ? p[0] : undefined));
+        const lon = toNum(p?.lon ?? (Array.isArray(p) ? p[1] : undefined));
+        return { lat, lon };
+      })
       .filter((p) => p.lat !== null && p.lon !== null) as { lat: number; lon: number }[],
     [line]
   );
 
   const validPoints = useMemo(
     () => (points ?? [])
-      .map((p) => ({ lat: toNum(p.lat), lon: toNum(p.lon), float_id: (p as any).float_id }))
+      .map((p: any) => {
+        const lat = toNum(p?.lat ?? (Array.isArray(p) ? p[0] : undefined));
+        const lon = toNum(p?.lon ?? (Array.isArray(p) ? p[1] : undefined));
+        return { lat, lon, float_id: p?.float_id };
+      })
       .filter((p) => p.lat !== null && p.lon !== null) as { lat: number; lon: number; float_id?: number }[],
     [points]
   );
