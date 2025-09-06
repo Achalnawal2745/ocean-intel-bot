@@ -168,7 +168,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
       x: profileParam || base.x || xOpts[0],
       invert_y: invertY ?? base.invert_y,
     } as any;
-  }, [result, profileSpec, invertY]);
+  }, [result, profileParam, invertY]);
 
   return (
     <Card className="shadow-depth">
