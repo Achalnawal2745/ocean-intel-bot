@@ -35,7 +35,7 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ onStatusChan
         console.log('Backend health check:', data);
       }
     } catch (error) {
-      console.error('Connection check failed:', error);
+      console.warn('Connection check failed');
       setIsConnected(false);
       setLastChecked(new Date());
       onStatusChange?.(false);

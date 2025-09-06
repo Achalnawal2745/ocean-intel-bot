@@ -170,6 +170,52 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
     } as any;
   }, [result, profileParam, invertY]);
 
+  // Derive map points from result.data when available
+  const derivedMapSpec = useMemo(() => {
+    const rows = Array.isArray(result?.data) ? result.data : [];
+    if (!rows.length) return null as null | { points: any[] };
+    const firstObj = rows.find((r: any) => r && typeof r === 'object');
+    if (!firstObj) return null as null | { points: any[] };
+    const keys = Object.keys(firstObj);
+
+    const chooseLatKey = (ks: string[]) => {
+      const lower = ks.map(k => k.toLowerCase());
+      const exacts = ["latitude", "lat"];
+      for (const ex of exacts) { const idx = lower.indexOf(ex); if (idx !== -1) return ks[idx]; }
+      const containsLatitude = ks.find(k => /latitude/i.test(k)); if (containsLatitude) return containsLatitude;
+      const containsLat = ks.find(k => /(^|[^a-z])lat([^a-z]|$)/i.test(k)); if (containsLat) return containsLat;
+      return undefined;
+    };
+    const chooseLonKey = (ks: string[]) => {
+      const lower = ks.map(k => k.toLowerCase());
+      const exacts = ["longitude", "lon", "lng"];
+      for (const ex of exacts) { const idx = lower.indexOf(ex); if (idx !== -1) return ks[idx]; }
+      const containsLongitude = ks.find(k => /longitude/i.test(k)); if (containsLongitude) return containsLongitude;
+      const containsLon = ks.find(k => /(^|[^a-z])(lon|lng)([^a-z]|$)/i.test(k)); if (containsLon) return containsLon;
+      return undefined;
+    };
+
+    const latKey = chooseLatKey(keys);
+    const lonKey = chooseLonKey(keys);
+    if (!latKey || !lonKey) return null as null | { points: any[] };
+
+    const toNum = (v: any) => {
+      if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+      if (typeof v === 'string') { const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
+      return null;
+    };
+    const inRange = (lat: number | null, lon: number | null) => {
+      if (lat === null || lon === null) return false;
+      return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+    };
+
+    const points = rows
+      .map((r: any) => ({ lat: toNum(r?.[latKey]), lon: toNum(r?.[lonKey]), float_id: r?.float_id || r?.id }))
+      .filter((p: any) => inRange(p.lat, p.lon));
+
+    return points.length ? { points } : null;
+  }, [result]);
+
   return (
     <Card className="shadow-depth">
       <CardHeader>
@@ -247,15 +293,21 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
         )}
 
         {/* Visualizations */}
-        {result.viz && (
+        {(result.viz || derivedMapSpec) && (
           <div className="space-y-4">
-            {result.viz.kind === "map" && (
-              <MapVisualization data={result.viz.spec} />
+            {(result.viz?.kind === "map" || derivedMapSpec) && (
+              <MapVisualization data={(function(){
+                const base = (result.viz?.spec as any) || {};
+                const withRows = { ...base, rows: Array.isArray(result.data) ? result.data : [] };
+                if (Array.isArray(base.points) && base.points.length) return withRows;
+                if (derivedMapSpec?.points?.length) return { ...withRows, points: derivedMapSpec.points };
+                return withRows;
+              })()} />
             )}
-            {result.viz.kind === "profile" && profileSpec && (
+            {result.viz?.kind === "profile" && profileSpec && (
               <ProfileChart data={filteredData} spec={profileSpec} />
             )}
-            {result.viz.kind === "profile_comparison" && profileSpec && (
+            {result.viz?.kind === "profile_comparison" && profileSpec && (
               <ProfileChart
                 data={filteredData}
                 spec={{
@@ -266,7 +318,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
                 }}
               />
             )}
-            {(result.viz.kind === "timeseries" || result.viz.kind === "temporal") && (
+            {(result.viz?.kind === "timeseries" || result.viz?.kind === "temporal") && (
               <TimeseriesChart data={filteredData} spec={result.viz.spec} />
             )}
           </div>
