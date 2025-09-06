@@ -177,17 +177,42 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
     const firstObj = rows.find((r: any) => r && typeof r === 'object');
     if (!firstObj) return null as null | { points: any[] };
     const keys = Object.keys(firstObj);
-    const latKey = keys.find((k) => /lat/i.test(k));
-    const lonKey = keys.find((k) => /lon|lng|longitude/i.test(k));
+
+    const chooseLatKey = (ks: string[]) => {
+      const lower = ks.map(k => k.toLowerCase());
+      const exacts = ["latitude", "lat"];
+      for (const ex of exacts) { const idx = lower.indexOf(ex); if (idx !== -1) return ks[idx]; }
+      const containsLatitude = ks.find(k => /latitude/i.test(k)); if (containsLatitude) return containsLatitude;
+      const containsLat = ks.find(k => /(^|[^a-z])lat([^a-z]|$)/i.test(k)); if (containsLat) return containsLat;
+      return undefined;
+    };
+    const chooseLonKey = (ks: string[]) => {
+      const lower = ks.map(k => k.toLowerCase());
+      const exacts = ["longitude", "lon", "lng"];
+      for (const ex of exacts) { const idx = lower.indexOf(ex); if (idx !== -1) return ks[idx]; }
+      const containsLongitude = ks.find(k => /longitude/i.test(k)); if (containsLongitude) return containsLongitude;
+      const containsLon = ks.find(k => /(^|[^a-z])(lon|lng)([^a-z]|$)/i.test(k)); if (containsLon) return containsLon;
+      return undefined;
+    };
+
+    const latKey = chooseLatKey(keys);
+    const lonKey = chooseLonKey(keys);
     if (!latKey || !lonKey) return null as null | { points: any[] };
+
     const toNum = (v: any) => {
       if (typeof v === 'number') return Number.isFinite(v) ? v : null;
       if (typeof v === 'string') { const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
       return null;
     };
+    const inRange = (lat: number | null, lon: number | null) => {
+      if (lat === null || lon === null) return false;
+      return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+    };
+
     const points = rows
       .map((r: any) => ({ lat: toNum(r?.[latKey]), lon: toNum(r?.[lonKey]), float_id: r?.float_id || r?.id }))
-      .filter((p: any) => p.lat !== null && p.lon !== null);
+      .filter((p: any) => inRange(p.lat, p.lon));
+
     return points.length ? { points } : null;
   }, [result]);
 
