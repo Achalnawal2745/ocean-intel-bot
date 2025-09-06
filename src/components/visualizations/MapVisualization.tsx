@@ -12,6 +12,7 @@ interface MapVisualizationProps {
     points?: { lat: number; lon: number; float_id?: number }[];
     start?: { lat: number; lon: number };
     end?: { lat: number; lon: number };
+    rows?: any[];
   };
 }
 
@@ -65,7 +66,7 @@ const WhenReadyFitBounds: React.FC<{ bounds?: LatLngBoundsExpression }>
   = ({ bounds }) => null; // handled via MapContainer 'bounds' prop in react-leaflet v4
 
 export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
-  const { line, points, start, end } = data;
+  const { line, points, start, end, rows } = data as any;
 
   const toNum = (v: any) => {
     if (typeof v === 'number') return Number.isFinite(v) ? v : null;
@@ -74,6 +75,26 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
       return Number.isFinite(n) ? n : null;
     }
     return null;
+  };
+
+  const deriveFromRows = (rowsIn: any[] | undefined) => {
+    const rowsArr = Array.isArray(rowsIn) ? rowsIn : [];
+    if (!rowsArr.length) return [] as { lat: number; lon: number; float_id?: number }[];
+    const first = rowsArr.find((r) => r && typeof r === 'object');
+    if (!first) return [] as { lat: number; lon: number; float_id?: number }[];
+    const keys = Object.keys(first);
+    const lower = keys.map(k => k.toLowerCase());
+    const pickKey = (candidates: string[], fallbackRegex: RegExp) => {
+      for (const c of candidates) { const i = lower.indexOf(c); if (i !== -1) return keys[i]; }
+      return keys.find(k => fallbackRegex.test(k)) as string | undefined;
+    };
+    const latKey = pickKey(["latitude", "lat"], /(^|[^a-z])lat([^a-z]|$)/i);
+    const lonKey = pickKey(["longitude", "lon", "lng"], /(^|[^a-z])(lon|lng)([^a-z]|$)/i);
+    const idKey = pickKey(["float_id", "id", "float id"], /id/i);
+    if (!latKey || !lonKey) return [] as { lat: number; lon: number; float_id?: number }[];
+    const inRange = (lat: number | null, lon: number | null) => lat !== null && lon !== null && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+    return rowsArr.map((r: any) => ({ lat: toNum(r?.[latKey]), lon: toNum(r?.[lonKey]), float_id: r?.[idKey as string] }))
+      .filter((p) => inRange(p.lat, p.lon)) as { lat: number; lon: number; float_id?: number }[];
   };
 
   const safeLine = useMemo(
@@ -88,14 +109,18 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
   );
 
   const validPoints = useMemo(
-    () => (points ?? [])
-      .map((p: any) => {
-        const lat = toNum(p?.lat ?? (Array.isArray(p) ? p[0] : undefined));
-        const lon = toNum(p?.lon ?? (Array.isArray(p) ? p[1] : undefined));
-        return { lat, lon, float_id: p?.float_id };
-      })
-      .filter((p) => p.lat !== null && p.lon !== null) as { lat: number; lon: number; float_id?: number }[],
-    [points]
+    () => {
+      const supplied = (points ?? [])
+        .map((p: any) => {
+          const lat = toNum(p?.lat ?? (Array.isArray(p) ? p[0] : undefined));
+          const lon = toNum(p?.lon ?? (Array.isArray(p) ? p[1] : undefined));
+          return { lat, lon, float_id: p?.float_id };
+        })
+        .filter((p) => p.lat !== null && p.lon !== null) as { lat: number; lon: number; float_id?: number }[];
+      if (supplied.length) return supplied;
+      return deriveFromRows(rows);
+    },
+    [points, rows]
   );
 
   const mapState = useMemo(() => computeMapState(safeLine, validPoints), [safeLine, validPoints]);
