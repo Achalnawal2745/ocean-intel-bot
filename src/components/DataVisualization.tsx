@@ -268,7 +268,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
         )}
 
         {/* Visualizations */}
-        {result.viz && (
+        {(result.viz || derivedMapSpec) && (
           <div className="space-y-4">
             {(result.viz?.kind === "map" || derivedMapSpec) && (
               <MapVisualization data={(function(){
@@ -278,10 +278,10 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
                 return base;
               })()} />
             )}
-            {result.viz.kind === "profile" && profileSpec && (
+            {result.viz?.kind === "profile" && profileSpec && (
               <ProfileChart data={filteredData} spec={profileSpec} />
             )}
-            {result.viz.kind === "profile_comparison" && profileSpec && (
+            {result.viz?.kind === "profile_comparison" && profileSpec && (
               <ProfileChart
                 data={filteredData}
                 spec={{
@@ -292,7 +292,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
                 }}
               />
             )}
-            {(result.viz.kind === "timeseries" || result.viz.kind === "temporal") && (
+            {(result.viz?.kind === "timeseries" || result.viz?.kind === "temporal") && (
               <TimeseriesChart data={filteredData} spec={result.viz.spec} />
             )}
           </div>
