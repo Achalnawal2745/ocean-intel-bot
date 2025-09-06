@@ -168,7 +168,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
       x: profileParam || base.x || xOpts[0],
       invert_y: invertY ?? base.invert_y,
     } as any;
-  }, [result, profileParam, invertY]);
+  }, [result, profileSpec, invertY]);
 
   return (
     <Card className="shadow-depth">
@@ -250,7 +250,24 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
         {result.viz && (
           <div className="space-y-4">
             {result.viz.kind === "map" && (
-              <MapVisualization data={result.viz.spec} />
+              <MapVisualization data={(function(){
+                const base = result.viz.spec || {};
+                if (Array.isArray(base.points) && base.points.length) return base;
+                const rows = Array.isArray(result.data) ? result.data : [];
+                if (!rows.length) return base;
+                const first = rows.find((r: any) => r && typeof r === 'object') || {};
+                const keys = Object.keys(first);
+                const latKey = keys.find((k) => /lat/i.test(k));
+                const lonKey = keys.find((k) => /lon|lng|longitude/i.test(k));
+                if (!latKey || !lonKey) return base;
+                const toNum = (v: any) => {
+                  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+                  if (typeof v === 'string') { const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
+                  return null;
+                };
+                const points = rows.map((r: any) => ({ lat: toNum(r?.[latKey]), lon: toNum(r?.[lonKey]), float_id: r?.float_id || r?.id })).filter((p: any) => p.lat !== null && p.lon !== null);
+                return { ...base, points };
+              })()} />
             )}
             {result.viz.kind === "profile" && profileSpec && (
               <ProfileChart data={filteredData} spec={profileSpec} />
