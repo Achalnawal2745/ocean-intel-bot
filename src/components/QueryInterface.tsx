@@ -30,6 +30,10 @@ export const QueryInterface: React.FC<QueryInterfaceProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim() || isLoading) return;
+    if (!connected) {
+      toast({ title: "Backend disconnected", description: "Set the backend URL in Connection Status, then retry.", variant: "destructive" });
+      return;
+    }
 
     setIsLoading(true);
     try {
