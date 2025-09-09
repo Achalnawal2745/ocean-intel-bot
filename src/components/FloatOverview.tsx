@@ -142,7 +142,17 @@ export const FloatOverview = () => {
         const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.FLOATS, { limit: '6' }));
         if (response.ok) {
           const data = await response.json();
-          const baseFloats: FloatData[] = data.floats || [];
+          const rawFloats = Array.isArray(data.floats) ? data.floats : [];
+          const baseFloats: FloatData[] = rawFloats.map((r: any) => ({
+            float_id: r.float_id,
+            pi_name: r.pi_name,
+            institution: r.operating_institute,
+            deployment_date: r.launch_date,
+            deployment_lat: r.launch_latitude,
+            deployment_lon: r.launch_longitude,
+            project_name: r.project_name,
+            data_center: r.float_owner,
+          }));
 
           const enriched = await Promise.all(
             baseFloats.map(async (f) => {
