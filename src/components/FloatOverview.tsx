@@ -131,13 +131,21 @@ const tryFetchDetails = async (floatId: number) => {
   return null;
 };
 
-export const FloatOverview = () => {
+export const FloatOverview = ({ connected = true }: { connected?: boolean }) => {
   const [floats, setFloats] = useState<FloatData[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchFloats = async () => {
+      if (!connected) {
+        setFloats([]);
+        setTotalCount(0);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
       try {
         const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.FLOATS, { limit: '6' }));
         if (response.ok) {
@@ -181,8 +189,8 @@ export const FloatOverview = () => {
             })
           );
 
-          setFloats(enriched);
-          
+          if (!cancelled) setFloats(enriched);
+
           const countResponse = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.QUERY), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -190,20 +198,39 @@ export const FloatOverview = () => {
           });
           if (countResponse.ok) {
             const countData = await countResponse.json();
-            setTotalCount(countData.data_count || 0);
+            if (!cancelled) setTotalCount(countData.data_count || 0);
           }
         }
       } catch (error) {
         console.error('Failed to fetch floats:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchFloats();
-  }, []);
+    return () => { cancelled = true; };
+  }, [connected]);
 
   const activeFloats = useMemo(() => floats.filter(f => f.is_active), [floats]);
+
+  if (!connected) {
+    return (
+      <Card className="shadow-ocean">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-3">
+            <Activity className="h-6 w-6 text-primary" />
+            <span>Active Float Network</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground">
+            Backend disconnected. Connect the backend to view floats.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (loading) {
     return (
