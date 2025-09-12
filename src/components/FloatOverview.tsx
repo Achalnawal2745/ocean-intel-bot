@@ -14,10 +14,6 @@ interface FloatData {
   deployment_lon: number;
   project_name: string;
   data_center: string;
-  latest_lat?: number;
-  latest_lon?: number;
-  latest_date?: string;
-  is_active?: boolean;
 }
 
 const extractLatest = (details: any) => {
