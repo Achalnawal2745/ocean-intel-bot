@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Loader2, RefreshCw } from "lucide-react";
-import { buildApiUrl, getApiBaseUrl, setApiBaseUrl, API_CONFIG } from "@/config/api";
+import { buildApiUrl, getApiBaseUrl, setApiBaseUrl, API_CONFIG, fetchWithTimeout } from "@/config/api";
 
 interface ConnectionStatusProps {
   onStatusChange?: (connected: boolean) => void;
