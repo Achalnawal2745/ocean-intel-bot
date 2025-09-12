@@ -354,7 +354,7 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
               />
             )}
             {(result.viz?.kind === "timeseries" || result.viz?.kind === "temporal") && (
-              <TimeseriesChart data={filteredData} spec={result.viz.spec} />
+              <TimeseriesChart data={filteredData} spec={{ x: result.viz.spec?.x, y: result.viz.spec?.y }} />
             )}
           </div>
         )}
