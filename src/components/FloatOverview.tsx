@@ -159,44 +159,7 @@ export const FloatOverview = ({ connected = true }: { connected?: boolean }) => 
             data_center: r.float_owner,
           }));
 
-          const enriched = await Promise.all(
-            baseFloats.map(async (f) => {
-              try {
-                const details = await tryFetchDetails(f.float_id);
-                const latest = details ? extractLatest(details || {}) : {};
-                const latest_lat = (latest as any).lat ?? f.deployment_lat;
-                const latest_lon = (latest as any).lon ?? f.deployment_lon;
-                const latest_date = (latest as any).date ?? f.deployment_date;
-
-                const active = Boolean(
-                  (latest_date && !sameDay(latest_date, f.deployment_date)) ||
-                  moved(latest_lat, latest_lon, f.deployment_lat, f.deployment_lon)
-                );
-
-                return {
-                  ...f,
-                  latest_lat,
-                  latest_lon,
-                  latest_date,
-                  is_active: active,
-                } as FloatData;
-              } catch {
-                return { ...f, is_active: false } as FloatData;
-              }
-            })
-          );
-
-          if (!cancelled) setFloats(enriched);
-
-          const countResponse = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.QUERY), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: "how many floats" })
-          });
-          if (countResponse.ok) {
-            const countData = await countResponse.json();
-            if (!cancelled) setTotalCount(countData.data_count || 0);
-          }
+          if (!cancelled) setFloats(baseFloats);
         }
       } catch (error) {
         console.error('Failed to fetch floats:', error);
