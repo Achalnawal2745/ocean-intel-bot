@@ -144,7 +144,7 @@ export const FloatOverview = ({ connected = true }: { connected?: boolean }) => 
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.FLOATS, { limit: '6' }));
+        const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.FLOATS, { limit: '9' }));
         if (response.ok) {
           const data = await response.json();
           const rawFloats = Array.isArray(data.floats) ? data.floats : [];
