@@ -161,8 +161,9 @@ export const FloatOverview = ({ connected = true }: { connected?: boolean }) => 
 
           if (!cancelled) setFloats(baseFloats);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to fetch floats:', error);
+        if (!cancelled) setError(error?.message || 'Failed to load floats');
       } finally {
         if (!cancelled) setLoading(false);
       }
