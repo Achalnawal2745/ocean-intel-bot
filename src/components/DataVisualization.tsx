@@ -160,10 +160,12 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
 
     if (result.viz?.kind === "timeseries" || result.viz?.kind === "temporal") {
       const xKey = result.viz.spec?.x || 'timestamp';
+      if (!xKey) return [];
       const start = tsStart ? new Date(tsStart) : null;
       const end = tsEnd ? new Date(tsEnd) : null;
       return result.data.filter((d: any) => {
-        const t = new Date(d[xKey]);
+        const tVal = d?.[xKey];
+        const t = new Date(tVal);
         if (t.toString() === 'Invalid Date') return false;
         if (start && t < start) return false;
         if (end) {
