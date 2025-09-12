@@ -130,7 +130,7 @@ const tryFetchDetails = async (floatId: number) => {
 export const FloatOverview = ({ connected = true }: { connected?: boolean }) => {
   const [floats, setFloats] = useState<FloatData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
