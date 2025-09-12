@@ -18,11 +18,12 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ onStatusChan
   const checkConnection = async () => {
     setIsChecking(true);
     try {
-      const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.HEALTH), {
+      const response = await fetchWithTimeout(buildApiUrl(API_CONFIG.ENDPOINTS.HEALTH), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
+        timeoutMs: 5000,
       });
 
       const connected = response.ok;
