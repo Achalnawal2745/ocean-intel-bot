@@ -72,6 +72,18 @@ export const DataVisualization: React.FC<DataVisualizationProps> = ({ result }) 
         setTsStart("");
         setTsEnd("");
       }
+      // Infer x/y if missing
+      const rows = Array.isArray(result.data) ? result.data : [];
+      const first = rows.find((r: any) => r && typeof r === 'object') || {};
+      const keys = Object.keys(first);
+      const timePrefs = ['profile_date','date','timestamp','time','datetime'];
+      const valuePrefs = ['avg_temperature','avg_temp','temperature','avg_salinity','avg_sal','salinity','value'];
+      const xKey = result.viz.spec?.x || timePrefs.find(k => keys.includes(k)) || (keys.find(k => /date|time/i.test(k)) || 'timestamp');
+      // pick first numeric-like key not equal to x
+      const numericKeys = keys.filter(k => k !== xKey && (typeof first[k] === 'number' || rows.some((r:any)=> Number.isFinite(Number(r?.[k])))));
+      const yKey = result.viz.spec?.y || valuePrefs.find(k => keys.includes(k)) || numericKeys[0];
+      (result.viz.spec ||= {}).x = xKey;
+      (result.viz.spec ||= {}).y = yKey;
     }
   }, [result, tsBounds]);
 
