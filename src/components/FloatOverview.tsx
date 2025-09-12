@@ -233,10 +233,10 @@ export const FloatOverview = ({ connected = true }: { connected?: boolean }) => 
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {floats.map((float_data) => {
-            const lat = float_data.latest_lat ?? float_data.deployment_lat;
-            const lon = float_data.latest_lon ?? float_data.deployment_lon;
-            const dateStr = float_data.latest_date || float_data.deployment_date;
-            const cardBorder = float_data.is_active ? "border-l-success" : "border-l-muted";
+            const lat = float_data.deployment_lat;
+            const lon = float_data.deployment_lon;
+            const dateStr = float_data.deployment_date;
+            const cardBorder = "border-l-muted";
             return (
               <Card key={float_data.float_id} className={`border-l-4 ${cardBorder} hover:shadow-glow transition-smooth`}>
                 <CardContent className="p-4 space-y-3">
