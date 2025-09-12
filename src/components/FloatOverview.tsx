@@ -225,7 +225,7 @@ export const FloatOverview = ({ connected = true }: { connected?: boolean }) => 
             <span>Float Network</span>
           </CardTitle>
           <Badge variant="secondary" className="text-lg px-3 py-1">
-            {activeFloats.length} Active • {totalCount} Total
+            {floats.length} Floats
           </Badge>
         </div>
       </CardHeader>
