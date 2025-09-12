@@ -142,6 +142,7 @@ export const FloatOverview = ({ connected = true }: { connected?: boolean }) => 
         return;
       }
       setLoading(true);
+      setError(null);
       try {
         const response = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.FLOATS, { limit: '6' }));
         if (response.ok) {
