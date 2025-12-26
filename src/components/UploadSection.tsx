@@ -129,7 +129,7 @@ export const UploadSection = () => {
           <span>Upload NetCDF Data</span>
         </CardTitle>
       </CardHeader>
-      
+
       <CardContent className="space-y-6">
         {uploadAvailable === false && (
           <div className="p-4 rounded-lg border border-warning/30 bg-warning/5 text-sm">
@@ -203,3 +203,5 @@ export const UploadSection = () => {
     </Card>
   );
 };
+
+export default UploadSection;

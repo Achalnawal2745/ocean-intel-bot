@@ -1,73 +1,91 @@
-# Welcome to your Lovable project
+# Ocean Intel Bot (FloatChat AI)
 
-## Project info
+An AI-powered oceanographic data analysis system designed to interact with Argo float data. This project combines a FastAPI backend with a React frontend to provide intelligent querying, visualization, and analysis of ocean data.
 
-**URL**: https://lovable.dev/projects/191b437f-123f-4c59-8fe8-fb9b6d3cdff0
+## Project Overview
 
-## How can I edit this code?
+**Ocean Intel Bot** (also referred to as FloatChat AI) allows users to query Argo float data using natural language. The system leverages Google's Gemini AI to interpret queries and generate SQL, explanations, or visualizations.
 
-There are several ways of editing your application.
+### Key Features
+- **Natural Language Querying**: Ask questions about ocean data in plain English.
+- **AI-Powered Analysis**: Uses Gemini Pro for query understanding and response generation.
+- **Data Visualization**: Interactive graphs and maps for depth profiles, trajectories, and time series.
+- **Regional Analysis**: Specialized analysis for regions like Arabian Sea, Indian Ocean, Bay of Bengal, etc.
 
-**Use Lovable**
+## Technology Stack
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/191b437f-123f-4c59-8fe8-fb9b6d3cdff0) and start prompting.
+### Backend
+- **FastAPI**: High-performance web framework for building APIs.
+- **Supabase (PostgreSQL)**: Database for storing float metadata, profiles, and measurements.
+- **Google Gemini AI**: For natural language processing and SQL generation.
+- **ChromaDB**: Vector database for semantic search (if applicable).
+- **Python Libraries**: `asyncpg`, `pandas`, `numpy`, `plotly`.
 
-Changes made via Lovable will be committed automatically to this repo.
+### Frontend
+- **Vite**: Next Generation Frontend Tooling.
+- **React**: Library for building user interfaces.
+- **TypeScript**: Typed superset of JavaScript.
+- **shadcn-ui**: Reusable components built with Radix UI and Tailwind CSS.
+- **Tailwind CSS**: Utility-first CSS framework.
 
-**Use your preferred IDE**
+## Getting Started
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Prerequisites
+- Node.js & npm
+- Python 3.10+
+- Supabase account and database setup
+- Google Gemini API Key
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Installation
 
-Follow these steps:
+1.  **Clone the repository**
+    ```sh
+    git clone <YOUR_GIT_URL>
+    cd ocean-intel-bot
+    ```
+
+2.  **Install Frontend Dependencies**
+    ```sh
+    npm install
+    ```
+
+3.  **Install Backend Dependencies**
+    ```sh
+    pip install -r requirements.txt
+    ```
+
+### Running the Application
+
+You can run both the backend and frontend concurrently using the provided script:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+npm run dev:full
 ```
 
-**Edit a file directly in GitHub**
+Or run them separately:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+**Backend:**
+```sh
+npm run start:backend
+# OR directly with python
+# python -m uvicorn backend15:app --reload
+```
 
-**Use GitHub Codespaces**
+**Frontend:**
+```sh
+npm run start:frontend
+# OR
+# npm run dev
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Project Structure
 
-## What technologies are used for this project?
+- `src/`: Frontend source code (React components, pages, hooks).
+- `backend15.py`: Main backend application entry point.
+- `backend*.py`: Previous iterations/modules of the backend.
+- `requirements.txt`: Python dependencies.
+- `package.json`: Frontend dependencies and scripts.
 
-This project is built with:
+## License
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/191b437f-123f-4c59-8fe8-fb9b6d3cdff0) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+[Add License Information Here]

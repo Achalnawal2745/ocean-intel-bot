@@ -113,3 +113,5 @@ export const TimeseriesChart: React.FC<TimeseriesChartProps> = ({ data, spec }) 
     </Card>
   );
 };
+
+export default TimeseriesChart;

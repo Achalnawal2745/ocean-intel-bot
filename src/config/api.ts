@@ -1,9 +1,25 @@
 // API Configuration for ARGO Backend (runtime overridable)
 const STORAGE_KEY = 'api_base_url';
 
+// Normalize a base URL: ensure protocol, remove trailing slash
+export const normalizeBaseUrl = (url: string): string => {
+  try {
+    if (!url) return '';
+    let value = String(url).trim();
+    if (!/^https?:\/\//i.test(value)) {
+      value = `http://${value}`; // default to http if protocol missing
+    }
+    // Remove trailing slash
+    value = value.replace(/\/+$/, '');
+    return value;
+  } catch {
+    return url;
+  }
+};
+
 export const API_CONFIG = {
   // Default to env, fallback to localhost (can be overridden at runtime via localStorage)
-  BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  BASE_URL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000',
 
   // API endpoints based on your FastAPI backend
   ENDPOINTS: {
@@ -22,7 +38,7 @@ export const getApiBaseUrl = (): string => {
   try {
     if (typeof window !== 'undefined') {
       const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (stored) return stored;
+      if (stored) return normalizeBaseUrl(stored);
       const host = window.location.hostname || '';
       const isLocal = /^(localhost|127\.0\.0\.1)$/i.test(host);
       const isDev = !!(import.meta as any)?.env?.DEV;
@@ -37,10 +53,11 @@ export const getApiBaseUrl = (): string => {
 export const setApiBaseUrl = (url: string) => {
   try {
     if (typeof window !== 'undefined') {
-      if (!url) {
+      const normalized = normalizeBaseUrl(url);
+      if (!normalized) {
         window.localStorage.removeItem(STORAGE_KEY);
       } else {
-        window.localStorage.setItem(STORAGE_KEY, url);
+        window.localStorage.setItem(STORAGE_KEY, normalized);
       }
     }
   } catch {}

@@ -136,7 +136,7 @@ export const FloatOverview = ({ connected = true }: { connected?: boolean }) => 
           </Badge>
         </div>
       </CardHeader>
-      
+
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {floats.map((float_data, idx) => {
@@ -193,3 +193,5 @@ export const FloatOverview = ({ connected = true }: { connected?: boolean }) => 
     </Card>
   );
 };
+
+export default FloatOverview;

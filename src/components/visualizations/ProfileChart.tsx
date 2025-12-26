@@ -155,15 +155,17 @@ export const ProfileChart: React.FC<ProfileChartProps> = ({ data, spec }) => {
         <div className="space-y-6">
           {group_by
             ? paramsToRender.map((param) => (
-                <div key={`grouped-${param}`}>{renderGroupedChart(param)}</div>
-              ))
+              <div key={`grouped-${param}`}>{renderGroupedChart(param)}</div>
+            ))
             : Object.entries(groups).map(([groupKey, groupData]) => (
-                <div key={groupKey} className="space-y-4">
-                  {paramsToRender.map((param) => renderSingleChart(groupKey, groupData, param))}
-                </div>
-              ))}
+              <div key={groupKey} className="space-y-4">
+                {paramsToRender.map((param) => renderSingleChart(groupKey, groupData, param))}
+              </div>
+            ))}
         </div>
       </CardContent>
     </Card>
   );
 };
+
+export default ProfileChart;

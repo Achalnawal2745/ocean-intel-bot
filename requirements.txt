@@ -1,0 +1,10 @@
+fastapi==0.110.0
+uvicorn==0.27.1
+asyncpg==0.29.0
+google-generativeai==0.4.1
+chromadb==0.4.24
+plotly==5.19.0
+pandas==2.2.2
+numpy==1.26.4
+supabase==2.4.1
+sentence-transformers==2.6.0

@@ -13,16 +13,23 @@ interface MapVisualizationProps {
     start?: { lat: number; lon: number };
     end?: { lat: number; lon: number };
     rows?: any[];
+    trajectories?: {
+      float_id: number;
+      points: { lat: number; lon: number;[key: string]: any }[];
+      color?: string;
+    }[];
   };
 }
 
 const computeMapState = (
   line?: { lat: number; lon: number }[],
-  points?: { lat: number; lon: number }[]
+  points?: { lat: number; lon: number }[],
+  trajectories?: { points: { lat: number; lon: number }[] }[]
 ) => {
   const coords = [
     ...(line ?? []),
-    ...(points ?? [])
+    ...(points ?? []),
+    ...(trajectories?.flatMap(t => t.points) ?? [])
   ];
   if (coords.length === 0) {
     return {
@@ -37,8 +44,8 @@ const computeMapState = (
   let minLon = Infinity;
   let maxLon = -Infinity;
   for (const p of coords) {
-    const lat = Number(p.lat);
-    const lon = Number(p.lon);
+    const lat = Number(p.lat ?? (p as any).latitude);
+    const lon = Number(p.lon ?? (p as any).longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
     if (lat < minLat) minLat = lat;
     if (lat > maxLat) maxLat = lat;
@@ -66,7 +73,7 @@ const WhenReadyFitBounds: React.FC<{ bounds?: LatLngBoundsExpression }>
   = ({ bounds }) => null; // handled via MapContainer 'bounds' prop in react-leaflet v4
 
 export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
-  const { line, points, start, end, rows } = data as any;
+  const { line, points, start, end, rows, trajectories } = data as any;
 
   const toNum = (v: any) => {
     if (typeof v === 'number') return Number.isFinite(v) ? v : null;
@@ -123,7 +130,7 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
     [points, rows]
   );
 
-  const mapState = useMemo(() => computeMapState(safeLine, validPoints), [safeLine, validPoints]);
+  const mapState = useMemo(() => computeMapState(safeLine, validPoints, trajectories), [safeLine, validPoints, trajectories]);
   const pathCoords: LatLngExpression[] = useMemo(
     () => safeLine.map((p) => [p.lat, p.lon] as [number, number]),
     [safeLine]
@@ -158,6 +165,16 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
             {pathCoords.length > 0 && (
               <Polyline positions={pathCoords} pathOptions={{ color: 'hsl(var(--accent))', weight: 3 }} />
             )}
+
+            {trajectories && trajectories.map((traj: any, idx: number) => (
+              <Polyline
+                key={traj.float_id || idx}
+                positions={traj.points.map((p: any) => [p.lat ?? p.latitude, p.lon ?? p.longitude])}
+                pathOptions={{ color: traj.color || 'hsl(var(--accent))', weight: 3 }}
+              >
+                <Popup>Float {traj.float_id}</Popup>
+              </Polyline>
+            ))}
 
             {start && Number.isFinite(Number(start.lat)) && Number.isFinite(Number(start.lon)) && (
               <CircleMarker
@@ -234,8 +251,18 @@ export const MapVisualization: React.FC<MapVisualizationProps> = ({ data }) => {
               </div>
             </div>
           )}
+
+          {trajectories && trajectories.length > 0 && (
+            <div className="absolute top-4 right-4 bg-background/90 backdrop-blur-sm rounded-lg border p-3 shadow-lg">
+              <div className="text-sm space-y-1">
+                <div className="font-semibold">{trajectories.length} floats</div>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
   );
 };
+
+export default MapVisualization;

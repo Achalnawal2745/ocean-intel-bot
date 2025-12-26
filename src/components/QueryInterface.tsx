@@ -60,13 +60,13 @@ export const QueryInterface: React.FC<QueryInterfaceProps> = ({
       const result = await response.json();
       console.log('Query result:', result);
       onQueryResult(result);
-      
+
       if (result.suggestions) {
         setSuggestions(result.suggestions);
       }
-      
+
       setQuery("");
-      
+
       toast({
         title: "Query processed",
         description: "Your oceanographic data query has been completed.",
@@ -95,7 +95,7 @@ export const QueryInterface: React.FC<QueryInterfaceProps> = ({
             <MessageCircle className="h-6 w-6 text-primary" />
             <h2 className="text-2xl font-semibold">Natural Language Query</h2>
           </div>
-          
+
           <form onSubmit={handleSubmit} className="flex space-x-3">
             <Input
               value={query}
@@ -144,3 +144,5 @@ export const QueryInterface: React.FC<QueryInterfaceProps> = ({
     </Card>
   );
 };
+
+export default QueryInterface;

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Loader2, RefreshCw } from "lucide-react";
-import { buildApiUrl, getApiBaseUrl, setApiBaseUrl, API_CONFIG, fetchWithTimeout } from "@/config/api";
+import { buildApiUrl, getApiBaseUrl, setApiBaseUrl, API_CONFIG, fetchWithTimeout, normalizeBaseUrl } from "@/config/api";
 
 interface ConnectionStatusProps {
   onStatusChange?: (connected: boolean) => void;
@@ -20,23 +20,57 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ onStatusChan
     try {
       const candidates: string[] = [];
       // Current configured base
+      const currentBase = getApiBaseUrl();
+      console.log('Checking connection with base URL:', currentBase);
       candidates.push(buildApiUrl(API_CONFIG.ENDPOINTS.HEALTH));
       if (typeof window !== 'undefined') {
         const origin = window.location.origin.replace(/\/$/, '');
         candidates.push(`${origin}${API_CONFIG.ENDPOINTS.HEALTH}`);
         candidates.push(`${origin}/api${API_CONFIG.ENDPOINTS.HEALTH}`);
       }
+      console.log('Connection candidates:', candidates);
 
       let successUrl: string | null = null;
       let resp: Response | null = null;
       for (const url of candidates) {
         try {
           const r = await fetchWithTimeout(url, { method: 'GET', headers: { 'Content-Type': 'application/json' }, timeoutMs: 5000 });
-          if (r.ok) { successUrl = url; resp = r; break; }
-        } catch {}
+          // Only treat as a true successful backend when the health endpoint reports a healthy status
+          if (r.ok) {
+            try {
+              const data = await r.clone().json();
+              const healthy = data && (data.status === 'healthy' || data.status === 'ready');
+              if (healthy) {
+                successUrl = url;
+                resp = r;
+                break;
+              } else {
+                // If the endpoint is reachable but reports degraded/unhealthy, still stop and surface that to the UI
+                successUrl = url;
+                resp = r;
+                break;
+              }
+            } catch {
+              // If response isn't JSON parseable, but r.ok is true, accept it as reachable
+              successUrl = url;
+              resp = r;
+              break;
+            }
+          }
+        } catch (err) {
+          // ignore candidate failures and try the next candidate
+          console.debug('Health probe failed for', url, err);
+        }
       }
 
-      const connected = !!resp && resp.ok;
+      let connected = false;
+      let healthData: any = null;
+      if (resp && resp.ok) {
+        try { healthData = await resp.json(); } catch { healthData = null }
+        // Consider connected only if health endpoint reports healthy/ready
+        connected = !!(healthData && (healthData.status === 'healthy' || healthData.status === 'ready'));
+        console.log('Connection result:', { successUrl, connected, healthData });
+      }
       setIsConnected(connected);
       setLastChecked(new Date());
       onStatusChange?.(connected);
@@ -49,9 +83,17 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ onStatusChan
           setBaseUrl(derivedBase);
         }
         try {
-          const data = await resp!.json();
-          console.log('Backend health check:', data);
-        } catch {}
+          console.log('Backend health check:', healthData || {});
+        } catch { }
+      }
+      else if (resp && resp.ok && !connected) {
+        // Reachable but unhealthy - set base and surface the info
+        const derivedBase = (successUrl || '').replace(/\/?health\/?$/i, '');
+        if (derivedBase && derivedBase !== getApiBaseUrl()) {
+          setApiBaseUrl(derivedBase);
+          setBaseUrl(derivedBase);
+        }
+        try { console.warn('Backend reachable but unhealthy', healthData || {}); } catch { }
       }
     } catch (error) {
       console.warn('Connection check failed');
@@ -67,15 +109,21 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ onStatusChan
     checkConnection();
     const interval = setInterval(checkConnection, 30000);
     return () => clearInterval(interval);
-  }, [baseUrl]);
+  }, []); // Initial load and periodic checks
 
   const onEditBaseUrl = () => {
     const current = getApiBaseUrl();
-    const value = window.prompt("Enter backend base URL (e.g., https://your-backend.example.com)", current);
+    const value = window.prompt("Enter backend base URL (e.g., http://127.0.0.1:8000)", current);
     if (value !== null) {
-      setApiBaseUrl(value.trim());
-      setBaseUrl(getApiBaseUrl());
-      checkConnection();
+      const trimmedValue = normalizeBaseUrl(value.trim());
+      console.log('Setting new base URL:', trimmedValue);
+      setApiBaseUrl(trimmedValue);
+      setBaseUrl(trimmedValue);
+      // Force immediate connection check with new URL
+      setTimeout(() => {
+        console.log('Checking connection with new URL:', trimmedValue);
+        checkConnection();
+      }, 100);
     }
   };
 
@@ -147,3 +195,5 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({ onStatusChan
     </Card>
   );
 };
+
+export default ConnectionStatus;

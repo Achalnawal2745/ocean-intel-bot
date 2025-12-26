@@ -27,7 +27,7 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
 
   // Get column headers from the first object
   const columns = Object.keys(data[0]);
-  
+
   // Filter data based on search term
   const filteredData = data.filter(row =>
     Object.values(row).some(value =>
@@ -44,7 +44,7 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
 
   const formatValue = (value: any, key: string) => {
     if (value === null || value === undefined) return "-";
-    
+
     // Format numbers based on column type
     if (typeof value === 'number') {
       if (key.includes('lat') || key.includes('lon') || key.includes('temperature') || key.includes('salinity')) {
@@ -55,7 +55,7 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
       }
       return value.toString();
     }
-    
+
     // Format dates
     if (key.includes('date') || key.includes('time')) {
       try {
@@ -64,7 +64,7 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
         return value.toString();
       }
     }
-    
+
     return value.toString();
   };
 
@@ -159,8 +159,8 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
                           <span className="capitalize">
                             {column.replace(/_/g, ' ')}
                           </span>
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className={`text-xs ${getColumnColor(columnType)}`}
                           >
                             {columnType}
@@ -219,3 +219,5 @@ export const DataTable: React.FC<DataTableProps> = ({ data }) => {
     </Card>
   );
 };
+
+export default DataTable;
