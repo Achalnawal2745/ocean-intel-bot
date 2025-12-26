@@ -7,9 +7,15 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configuration (Align with backend16.py)
-DATABASE_URL = "postgresql://postgres.locaacxacuphdlfautru:nawal12345@aws-1-ap-south-1.pooler.supabase.com:6543/postgres"
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is not set")
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")

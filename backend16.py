@@ -33,12 +33,16 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from chromadb.utils import embedding_functions
 from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # ==================== CONFIGURATION ====================
-DATABASE_URL = "postgresql://postgres.locaacxacuphdlfautru:nawal12345@aws-1-ap-south-1.pooler.supabase.com:6543/postgres"
-GEMINI_API_KEY = "AIzaSyDRnw_WJgxT0GZX-qPHsYf6BqA0Bz8o5NQ"
-SUPABASE_URL = "https://locaacxacuphdlfautru.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvY2FhY3hhY3VwaGRsZmF1dHJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTcyMjMxNTksImV4cCI6MjA3Mjc5OTE1OX0.KDBXCTWWtxqseTpZk3IIMpnszBPWk7yqT1gR192nLA4"
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@host:port/dbname")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "your-gemini-api-key")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "https://your-project.supabase.co")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY", "your-supabase-key")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
