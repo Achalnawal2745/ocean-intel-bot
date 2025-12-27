@@ -29,3 +29,33 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+
+# Data Ingestion Pipeline Files
+netcdf_data/
+*.nc
+download_floats.py
+ingest_floats.py
+download_sample.py
+download_and_ingest.py
+ingest_argo.py
+ingest_argo_enhanced.py
+verify_ingestion.py
+check_metadata.py
+check_db_connection.py
+inspect_meta.py
+inspect_netcdf.py
+quick_check.py
+list_floats.py
+HOW_TO_ADD_FLOATS.md
+verify_backend.py
+# Database
+chroma_db/

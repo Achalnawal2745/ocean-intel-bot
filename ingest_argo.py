@@ -33,15 +33,20 @@ class ArgoIngester:
             # Open NetCDF file
             ds = xr.open_dataset(file_path)
             
-            # Extract Metadata
-            platform_number = int(ds.PLATFORM_NUMBER.values[0].astype(str).strip())
-            pi_name = str(ds.PI_NAME.values[0].astype(str).strip())
-            project_name = str(ds.PROJECT_NAME.values[0].astype(str).strip())
+            # Extract Metadata (handle both bytes and strings)
+            def safe_str(val):
+                if isinstance(val, bytes):
+                    return val.decode('utf-8').strip()
+                return str(val).strip()
+            
+            platform_number = int(safe_str(ds.PLATFORM_NUMBER.values[0]))
+            pi_name = safe_str(ds.PI_NAME.values[0])
+            project_name = safe_str(ds.PROJECT_NAME.values[0])
             
             logger.info(f"Float ID: {platform_number}, PI: {pi_name}")
 
-            # Connect to DB
-            conn = await asyncpg.connect(self.db_url)
+            # Connect to DB (disable statement cache for Supabase compatibility)
+            conn = await asyncpg.connect(self.db_url, statement_cache_size=0)
             try:
                 # 1. Upsert Float Metadata
                 await conn.execute("""
