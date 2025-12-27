@@ -1026,30 +1026,35 @@ class OptimizedArgoMCPServer:
             return {"error": f"Parameter resolution failed: {str(e)}"}
     
     async def _synthesize_orchestration_results(self, original_query: str, tool_results: Dict, expected_output: str) -> Dict:
-        """Generate AI response from orchestration results"""
+        """Generate AI response from orchestration results with multi-format support"""
         prompt = f"""
-        Original Query: "{original_query}"
-        Expected Output: "{expected_output}"
-        
-        Tool Execution Results:
-        {json.dumps(tool_results, default=str, indent=2)}
-        
-        Create a comprehensive, synthesized response that answers the original query using all the tool results.
-        Provide key insights, patterns, and conclusions. Be specific about the data found.
-        
-        If there were any errors in the execution, acknowledge them but still provide insights from successful steps.
-        
-        IMPORTANT: Highlight whether we provided COMPLETE data (all floats) or SAMPLE data (some floats).
-        """
+    Original Query: "{original_query}"
+    Expected Output: "{expected_output}"
+    
+    Tool Execution Results:
+    {json.dumps(tool_results, default=str, indent=2)}
+    
+    Create a comprehensive, synthesized response that answers the original query using all the tool results.
+    Provide key insights, patterns, and conclusions. Be specific about the data found.
+    
+    If there were any errors in the execution, acknowledge them but still provide insights from successful steps.
+    
+    IMPORTANT: Highlight whether we provided COMPLETE data (all floats) or SAMPLE data (some floats).
+    """
         
         try:
             response = await asyncio.to_thread(
                 lambda: self.gemini_model.generate_content(prompt)
             )
+            
+            # Build multi-format response
+            multi_format_response = self._build_multi_format_response(original_query, tool_results)
+            
             return {
                 "ai_synthesized_response": response.text,
                 "tool_results": tool_results,
-                "processing_source": "complex_orchestration"
+                "processing_source": "complex_orchestration",
+                **multi_format_response  # Add formats: text, map, graph
             }
         except Exception as e:
             return {
@@ -1057,6 +1062,164 @@ class OptimizedArgoMCPServer:
                 "tool_results": tool_results,
                 "processing_source": "complex_orchestration"
             }
+    
+    def _build_multi_format_response(self, query: str, tool_results: Dict) -> Dict:
+        """
+        Detect and package data in multiple formats (text, map, graph)
+        Frontend can check which formats are available and render accordingly
+        """
+        formats = {
+            "text": True,  # Always include text (ai_synthesized_response)
+            "map": None,
+            "graph": None
+        }
+        
+        # Detect MAP data (trajectories, locations)
+        map_data = self._extract_map_data(tool_results)
+        if map_data:
+            formats["map"] = map_data
+        
+        # Detect GRAPH data (comparisons, depth profiles, time series)
+        graph_data = self._extract_graph_data(tool_results)
+        if graph_data:
+            formats["graph"] = graph_data
+        
+        # Build response with available formats
+        response = {"formats": formats}
+        
+        # Add primary format (for backward compatibility)
+        if formats["map"] and formats["graph"]:
+            response["response_type"] = "multi"  # Both map and graph
+        elif formats["map"]:
+            response["response_type"] = "map"
+        elif formats["graph"]:
+            response["response_type"] = "graph"
+        else:
+            response["response_type"] = "text"
+        
+        return response
+    
+    def _extract_map_data(self, tool_results: Dict) -> Optional[Dict]:
+        """Extract map-ready data from tool results"""
+        map_data = None
+        
+        # Check for trajectory data
+        if "get_trajectory" in tool_results:
+            map_data = {
+                "type": "trajectory",
+                "data": tool_results["get_trajectory"]
+            }
+        
+        # Check for multiple trajectories
+        elif "get_multiple_trajectories" in tool_results:
+            map_data = {
+                "type": "multiple_trajectories",
+                "data": tool_results["get_multiple_trajectories"]
+            }
+        
+        # Check for regional floats (can show as markers)
+        elif "get_floats_in_region" in tool_results:
+            region_data = tool_results["get_floats_in_region"]
+            if "floats" in region_data:
+                # Extract coordinates from float metadata
+                markers = []
+                for float_info in region_data.get("floats", []):
+                    if isinstance(float_info, dict):
+                        lat = float_info.get("launch_latitude")
+                        lon = float_info.get("launch_longitude")
+                        if lat is not None and lon is not None:
+                            markers.append({
+                                "lat": lat,
+                                "lon": lon,
+                                "float_id": float_info.get("platform_number"),
+                                "name": f"Float {float_info.get('platform_number')}"
+                            })
+                
+                if markers:
+                    map_data = {
+                        "type": "markers",
+                        "data": {
+                            "region": region_data.get("region"),
+                            "markers": markers
+                        }
+                    }
+        
+        return map_data
+    
+    def _extract_graph_data(self, tool_results: Dict) -> Optional[Dict]:
+        """Extract graph-ready data from tool results"""
+        graph_data = None
+        
+        # Check for comparison data (bar chart)
+        if "compare_floats" in tool_results:
+            comparison = tool_results["compare_floats"].get("comparison", {})
+            if comparison:
+                float_ids = []
+                avg_values = []
+                min_values = []
+                max_values = []
+                
+                for float_id, data in comparison.items():
+                    stats = data.get("statistics", {})
+                    float_ids.append(str(float_id))
+                    avg_values.append(stats.get("avg_value"))
+                    min_values.append(stats.get("min_value"))
+                    max_values.append(stats.get("max_value"))
+                
+                graph_data = {
+                    "type": "bar_chart",
+                    "data": {
+                        "labels": float_ids,
+                        "datasets": [
+                            {
+                                "label": "Average",
+                                "values": avg_values
+                            },
+                            {
+                                "label": "Min",
+                                "values": min_values
+                            },
+                            {
+                                "label": "Max",
+                                "values": max_values
+                            }
+                        ],
+                        "parameter": tool_results["compare_floats"].get("parameter", "value")
+                    }
+                }
+        
+        # Check for depth profile (line chart)
+        elif "get_depth_profile" in tool_results:
+            profile = tool_results["get_depth_profile"]
+            if "data" in profile:
+                graph_data = {
+                    "type": "line_chart",
+                    "data": {
+                        "x": profile.get("depths", []),
+                        "y": profile.get("values", []),
+                        "x_label": "Depth (m)",
+                        "y_label": profile.get("parameter", "Value"),
+                        "title": f"Depth Profile - Float {profile.get('float_id')}"
+                    }
+                }
+        
+        # Check for time series (line chart)
+        elif "get_timeseries" in tool_results:
+            timeseries = tool_results["get_timeseries"]
+            if "data" in timeseries:
+                graph_data = {
+                    "type": "line_chart",
+                    "data": {
+                        "x": timeseries.get("dates", []),
+                        "y": timeseries.get("values", []),
+                        "x_label": "Date",
+                        "y_label": timeseries.get("parameter", "Value"),
+                        "title": f"Time Series - Float {timeseries.get('float_id')}"
+                    }
+                }
+        
+        return graph_data
+
 
     # ==================== MAIN PROCESSING FLOW ====================
     async def process_query_optimized(self, query: str, session_id: str) -> Dict[str, Any]:
@@ -2336,6 +2499,81 @@ async def get_multiple_trajectories(payload: Dict[str, Any]):
         detail = result.get("error") or "Multiple trajectories failed; see server logs for details"
         raise HTTPException(status_code=404, detail=detail)
     return result
+
+# ==================== ADMIN ENDPOINTS - FLOAT INGESTION ====================
+
+@app.post("/admin/download-float")
+async def admin_download_float(payload: Dict[str, Any]):
+    """
+    Download NetCDF files for a float from ARGO FTP server
+    
+    Body: { "float_id": "1902669" }
+    
+    Returns: {
+        "success": bool,
+        "float_id": str,
+        "files_downloaded": list,
+        "message": str
+    }
+    """
+    float_id = payload.get("float_id", "").strip()
+    
+    if not float_id:
+        raise HTTPException(status_code=400, detail="float_id is required")
+    
+    try:
+        from argo_ingestion import download_float
+        result = download_float(float_id)
+        
+        if not result.get("success"):
+            raise HTTPException(status_code=500, detail=result.get("message", "Download failed"))
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Download endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
+
+@app.post("/admin/ingest-float")
+async def admin_ingest_float(payload: Dict[str, Any]):
+    """
+    Ingest NetCDF files for a float into database
+    
+    Body: { "float_id": "1902669" }
+    
+    Returns: {
+        "success": bool,
+        "float_id": str,
+        "profiles_count": int,
+        "measurements_count": int,
+        "message": str
+    }
+    """
+    float_id = payload.get("float_id", "").strip()
+    
+    if not float_id:
+        raise HTTPException(status_code=400, detail="float_id is required")
+    
+    try:
+        from argo_ingestion import ingest_float
+        result = await ingest_float(float_id, DATABASE_URL)
+        
+        if not result.get("success"):
+            error_msg = result.get("message", "Ingestion failed")
+            if "not found" in error_msg.lower():
+                raise HTTPException(status_code=404, detail=error_msg)
+            else:
+                raise HTTPException(status_code=500, detail=error_msg)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ingestion endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
