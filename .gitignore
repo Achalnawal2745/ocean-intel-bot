@@ -42,3 +42,4 @@ venv/
 
 # Database
 chroma_db/
+netcdf_data/
