@@ -1,91 +1,146 @@
-# Ocean Intel Bot (FloatChat AI)
+# ARGO Ocean Intelligence System
 
-An AI-powered oceanographic data analysis system designed to interact with Argo float data. This project combines a FastAPI backend with a React frontend to provide intelligent querying, visualization, and analysis of ocean data.
+AI-powered conversational interface for ARGO oceanographic float data.
 
-## Project Overview
+## Features
 
-**Ocean Intel Bot** (also referred to as FloatChat AI) allows users to query Argo float data using natural language. The system leverages Google's Gemini AI to interpret queries and generate SQL, explanations, or visualizations.
+- 🤖 **Natural Language Queries** - Ask questions in plain English
+- 🗺️ **Interactive Maps** - Visualize float trajectories and locations
+- 📊 **Dynamic Charts** - Compare temperature, salinity, and other parameters
+- 💾 **Automated Data Pipeline** - Download and ingest NetCDF files via HTTP
+- 🧠 **3-Layer AI System** - Intelligent query processing with Gemini 2.5 Flash
 
-### Key Features
-- **Natural Language Querying**: Ask questions about ocean data in plain English.
-- **AI-Powered Analysis**: Uses Gemini Pro for query understanding and response generation.
-- **Data Visualization**: Interactive graphs and maps for depth profiles, trajectories, and time series.
-- **Regional Analysis**: Specialized analysis for regions like Arabian Sea, Indian Ocean, Bay of Bengal, etc.
+## Quick Start
 
-## Technology Stack
+### 1. Install Dependencies
 
-### Backend
-- **FastAPI**: High-performance web framework for building APIs.
-- **Supabase (PostgreSQL)**: Database for storing float metadata, profiles, and measurements.
-- **Google Gemini AI**: For natural language processing and SQL generation.
-- **ChromaDB**: Vector database for semantic search (if applicable).
-- **Python Libraries**: `asyncpg`, `pandas`, `numpy`, `plotly`.
-
-### Frontend
-- **Vite**: Next Generation Frontend Tooling.
-- **React**: Library for building user interfaces.
-- **TypeScript**: Typed superset of JavaScript.
-- **shadcn-ui**: Reusable components built with Radix UI and Tailwind CSS.
-- **Tailwind CSS**: Utility-first CSS framework.
-
-## Getting Started
-
-### Prerequisites
-- Node.js & npm
-- Python 3.10+
-- Supabase account and database setup
-- Google Gemini API Key
-
-### Installation
-
-1.  **Clone the repository**
-    ```sh
-    git clone <YOUR_GIT_URL>
-    cd ocean-intel-bot
-    ```
-
-2.  **Install Frontend Dependencies**
-    ```sh
-    npm install
-    ```
-
-3.  **Install Backend Dependencies**
-    ```sh
-    pip install -r requirements.txt
-    ```
-
-### Running the Application
-
-You can run both the backend and frontend concurrently using the provided script:
-
-```sh
-npm run dev:full
+```bash
+pip install -r requirements.txt
 ```
 
-Or run them separately:
+### 2. Configure Environment
 
-**Backend:**
-```sh
-npm run start:backend
-# OR directly with python
-# python -m uvicorn backend15:app --reload
+Create `.env` file:
+```
+DATABASE_URL=postgresql://user:password@localhost:5432/argo_db
+GEMINI_API_KEY=your_gemini_api_key
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
 ```
 
-**Frontend:**
-```sh
-npm run start:frontend
-# OR
-# npm run dev
+### 3. Start the System
+
+**Windows:**
+```bash
+start.bat
+```
+
+**Manual:**
+```bash
+# Terminal 1 - Backend
+python -m uvicorn backend16:app --reload
+
+# Terminal 2 - Frontend
+streamlit run app.py
+```
+
+## Usage
+
+### Web Interface
+
+1. Open http://localhost:8501
+2. Ask questions like:
+   - "Show floats in Indian Ocean"
+   - "Compare salinity for floats 1902669 and 1902670"
+   - "Temperature depth profile for float 2900565"
+
+### Add New Floats
+
+Use the Admin panel in the sidebar:
+1. Enter float ID (e.g., 2900565)
+2. Click "Download & Ingest"
+3. Wait for confirmation
+
+Or use command line:
+```bash
+# Download
+curl -X POST http://127.0.0.1:8000/admin/download-float -H "Content-Type: application/json" -d '{"float_id": "2900565"}'
+
+# Ingest
+curl -X POST http://127.0.0.1:8000/admin/ingest-float -H "Content-Type: application/json" -d '{"float_id": "2900565"}'
+```
+
+## Architecture
+
+```
+┌─────────────────┐
+│  Streamlit UI   │ ← User Interface
+└────────┬────────┘
+         │
+         ↓
+┌─────────────────┐
+│  FastAPI Backend│ ← REST API
+└────────┬────────┘
+         │
+    ┌────┴────┐
+    ↓         ↓
+┌────────┐ ┌──────────┐
+│Gemini  │ │PostgreSQL│
+│AI      │ │Database  │
+└────────┘ └──────────┘
 ```
 
 ## Project Structure
 
-- `src/`: Frontend source code (React components, pages, hooks).
-- `backend15.py`: Main backend application entry point.
-- `backend*.py`: Previous iterations/modules of the backend.
-- `requirements.txt`: Python dependencies.
-- `package.json`: Frontend dependencies and scripts.
+```
+ocean-intel-bot/
+├── app.py                 # Streamlit frontend
+├── backend16.py           # FastAPI backend
+├── argo_ingestion.py      # Data ingestion module
+├── download_floats.py     # Download script
+├── ingest_floats.py       # Ingestion script
+├── requirements.txt       # Dependencies
+├── start.bat             # Startup script
+└── .env                  # Environment variables
+```
+
+## API Endpoints
+
+### Query
+```
+POST /query
+Body: {"query": "show floats in indian ocean"}
+```
+
+### Admin - Download Float
+```
+POST /admin/download-float
+Body: {"float_id": "2900565"}
+```
+
+### Admin - Ingest Float
+```
+POST /admin/ingest-float
+Body: {"float_id": "2900565"}
+```
+
+### Health Check
+```
+GET /health
+```
+
+## Technologies
+
+- **Backend**: FastAPI, Python 3.11+
+- **Frontend**: Streamlit, Folium, Plotly
+- **Database**: PostgreSQL, ChromaDB
+- **AI**: Google Gemini 2.5 Flash
+- **Data**: ARGO NetCDF files (HTTP download)
 
 ## License
 
-[Add License Information Here]
+MIT License
+
+## Contact
+
+For questions or issues, please open an issue on GitHub.
