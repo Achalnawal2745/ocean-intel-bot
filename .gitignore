@@ -19,6 +19,25 @@ dist
 dist-ssr
 *.local
 
+# Data Ingestion Pipeline Files
+netcdf_data/
+*.nc
+download_floats.py
+ingest_floats.py
+download_and_ingest.py
+download_sample.py
+ingest_argo.py
+ingest_argo_enhanced.py
+HOW_TO_ADD_FLOATS.md
+
+# Test and Verification Scripts
+test_*.py
+verify_*.py
+check_*.py
+inspect_*.py
+quick_check.py
+add_float.py
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
