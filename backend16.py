@@ -1410,6 +1410,150 @@ class OptimizedArgoMCPServer:
 
     # ==================== COMPREHENSIVE MCP TOOLS ====================
     
+    def standardize_response(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Unified response standardizer.
+        Converts ANY response (Layer 1, 2, 3, or tools) into a consistent schema:
+        {
+            "text": str,
+            "visualizations": [
+                { "type": "map"|"graph", "data": ... }
+            ]
+        }
+        """
+        response = {
+            "text": "",
+            "visualizations": []
+        }
+        
+        # 1. Extract Text
+        if "ai_synthesized_response" in raw_data:
+            response["text"] = raw_data["ai_synthesized_response"]
+        elif "message" in raw_data:
+            response["text"] = raw_data["message"]
+        elif "result" in raw_data and isinstance(raw_data["result"], dict):
+            # Handle nested result wrapper common in some layers
+            inner = raw_data["result"]
+            if "ai_synthesized_response" in inner:
+                response["text"] = inner["ai_synthesized_response"]
+            elif "message" in inner:
+                response["text"] = inner["message"]
+        
+        # 2. Extract Visualizations (Recursive check)
+        # Helper to extract from a specific dict
+        def extract_viz(data):
+            if not isinstance(data, dict):
+                return
+                
+            # Map Data (Trajectory/Markers)
+            if "map_data" in data and data["map_data"]:
+                response["visualizations"].append({
+                    "type": "map",
+                    "data": data["map_data"],
+                    "title": "Float Map"
+                })
+            elif "formats" in data and isinstance(data["formats"], dict) and data["formats"].get("map"):
+                response["visualizations"].append({
+                    "type": "map",
+                    "data": data["formats"]["map"],
+                    "title": "Float Map"
+                })
+            elif "floats" in data and isinstance(data["floats"], list) and len(data["floats"]) > 0:
+                 # Auto-detect float list as map marker data
+                 response["visualizations"].append({
+                    "type": "map",
+                    "data": {
+                        "type": "markers",
+                        "data": { "markers": self._extract_markers(data["floats"]) }
+                    },
+                    "title": "Float Locations"
+                })
+                
+            # Graph Data
+            if "plot_data" in data and data["plot_data"]:
+                 response["visualizations"].append({
+                    "type": "graph",
+                    "data": {
+                        "type": "line_chart",
+                        "data": {
+                            "x": data["plot_data"]["data"].get("depths", []),
+                            "y": data["plot_data"]["data"].get("values", []),
+                            "x_label": "Depth (m)",
+                            "y_label": data.get("parameter", "Value"),
+                            "title": f"Depth Profile"
+                        }
+                    },
+                    "title": "Depth Profile"
+                })
+            elif "timeseries_data" in data and data["timeseries_data"]:
+                response["visualizations"].append({
+                    "type": "graph",
+                    "data": {
+                        "type": "line_chart",
+                        "data": {
+                            "x": data["timeseries_data"]["data"].get("dates", []),
+                            "y": data["timeseries_data"]["data"].get("values", []),
+                            "x_label": "Date",
+                            "y_label": data.get("parameter", "Value"),
+                            "title": f"Time Series"
+                        }
+                    },
+                    "title": "Time Series"
+                })
+            elif "comparison" in data and data["comparison"]:
+                # Convert comparison dict to standard graph format
+                comp = data["comparison"]
+                fids = list(comp.keys())
+                response["visualizations"].append({
+                    "type": "graph",
+                    "data": {
+                        "type": "bar_chart",
+                        "data": {
+                            "labels": [str(f) for f in fids],
+                            "datasets": [{
+                                "label": "Mean Value",
+                                "values": [comp[f]["statistics"]["avg_value"] for f in fids]
+                            }],
+                            "parameter": data.get("parameter", "Value")
+                        }
+                    },
+                    "title": "Float Comparison"
+                })
+            elif "formats" in data and isinstance(data["formats"], dict) and data["formats"].get("graph"):
+                 response["visualizations"].append({
+                    "type": "graph",
+                    "data": data["formats"]["graph"],
+                    "title": "Data Visualization"
+                })
+        
+        # Run extraction on main object
+        extract_viz(raw_data)
+        
+        # Run extraction on nested result object if it exists
+        if "result" in raw_data and isinstance(raw_data["result"], dict):
+            extract_viz(raw_data["result"])
+            
+        # 3. Default Text if Missing
+        if not response["text"]:
+            if response["visualizations"]:
+                response["text"] = "I processed your query. Check the visualizations below!"
+            else:
+                response["text"] = "I processed your request."
+                
+        return response
+
+    def _extract_markers(self, floats_list):
+        """Helper to extract map markers from simple float list"""
+        markers = []
+        for f in floats_list:
+            if isinstance(f, dict) and f.get("launch_latitude") is not None:
+                markers.append({
+                    "lat": f["launch_latitude"], 
+                    "lon": f["launch_longitude"],
+                    "name": f"Float {f.get('platform_number')}"
+                })
+        return markers
+    
     async def query_measurements(self, float_id: Optional[int] = None, parameter: Optional[str] = None,
                                depth_range: Optional[Tuple[float, float]] = None,
                                cycle_range: Optional[Tuple[int, int]] = None, limit: int = 1000) -> Any:
@@ -2366,26 +2510,19 @@ async def process_query(payload: Dict[str, Any]):
     logger.info(f"Processing query: {query} (session: {session_id})")
     
     try:
-        result = await mcp_server.process_query_optimized(query, session_id)
+        raw_result = await mcp_server.process_query_optimized(query, session_id)
+        
+        # Standardize the response structure
+        # This ensures frontend gets a consistent format regardless of which layer produced the result
+        standardized_response = mcp_server.standardize_response(raw_result)
+        
+        # Add metadata
+        standardized_response["session_id"] = session_id
+        standardized_response["query"] = query
+        standardized_response["raw_result"] = raw_result # Keep raw result for debugging if needed
+        
+        return standardized_response
 
-        inner = result.get("result") if isinstance(result, dict) else None
-        if isinstance(inner, dict) and "error" in inner:
-            detail = inner.get("error") or "Query failed; see server logs for details"
-            raise HTTPException(status_code=404, detail=detail)
-
-        if isinstance(inner, dict):
-            merged = {**result}
-            merged.update(inner)
-            merged.pop("result", None)
-            merged["session_id"] = session_id
-            merged["query"] = query
-            return merged
-
-        return {
-            **result,
-            "session_id": session_id,
-            "query": query
-        }
     except Exception as e:
         logger.error(f"Query processing failed: {e}")
         analysis = await mcp_server.analyze_with_llm(query)
