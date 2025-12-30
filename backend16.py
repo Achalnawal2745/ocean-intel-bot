@@ -1413,133 +1413,219 @@ class OptimizedArgoMCPServer:
     def standardize_response(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Unified response standardizer.
-        Converts ANY response (Layer 1, 2, 3, or tools) into a consistent schema:
+        Ensures EVERY response (Layer 1, 2, 3) follows the EXACT format the frontend expects.
+        Expected Schema:
         {
-            "text": str,
-            "visualizations": [
-                { "type": "map"|"graph", "data": ... }
-            ]
+            "ai_synthesized_response": str,
+            "formats": {
+                "text": bool,
+                "map": Optional[Dict],
+                "graph": Optional[Dict]
+            },
+            "response_type": "text" | "map" | "graph" | "multi"
         }
         """
+        # 1. Initialize result structure
         response = {
-            "text": "",
-            "visualizations": []
+            "ai_synthesized_response": "",
+            "formats": {
+                "text": True,
+                "map": None,
+                "graph": None
+            },
+            "response_type": "text"
         }
+
+        # 2. Extract Text
+        # Checks various fields where text or errors might be hidden
+        text_sources = [
+            raw_data.get("ai_synthesized_response"),
+            raw_data.get("message"),
+            raw_data.get("error"),
+            raw_data.get("detail"),
+            raw_data.get("result", {}).get("ai_synthesized_response") if isinstance(raw_data.get("result"), dict) else None,
+            raw_data.get("result", {}).get("message") if isinstance(raw_data.get("result"), dict) else None,
+            raw_data.get("result", {}).get("error") if isinstance(raw_data.get("result"), dict) else None,
+            raw_data.get("ai_analysis")
+        ]
         
-        # 1. Extract Text
-        if "ai_synthesized_response" in raw_data:
-            response["text"] = raw_data["ai_synthesized_response"]
-        elif "message" in raw_data:
-            response["text"] = raw_data["message"]
-        elif "result" in raw_data and isinstance(raw_data["result"], dict):
-            # Handle nested result wrapper common in some layers
-            inner = raw_data["result"]
-            if "ai_synthesized_response" in inner:
-                response["text"] = inner["ai_synthesized_response"]
-            elif "message" in inner:
-                response["text"] = inner["message"]
-        
-        # 2. Extract Visualizations (Recursive check)
-        # Helper to extract from a specific dict
-        def extract_viz(data):
+        for text in text_sources:
+            if text:
+                response["ai_synthesized_response"] = text
+                break
+
+        # 3. Detect MAP and GRAPH data (The "Master Translator")
+        # Handle cases where the data is already in the 'formats' object (Layer 2)
+        if "formats" in raw_data:
+            response["formats"].update(raw_data["formats"])
+        elif isinstance(raw_data.get("result"), dict) and "formats" in raw_data["result"]:
+            response["formats"].update(raw_data["result"]["formats"])
+
+        # Layer 1/3 extraction helper
+        def extract_visuals(data):
             if not isinstance(data, dict):
                 return
-                
-            # Map Data (Trajectory/Markers)
-            if "map_data" in data and data["map_data"]:
-                response["visualizations"].append({
-                    "type": "map",
-                    "data": data["map_data"],
-                    "title": "Float Map"
-                })
-            elif "formats" in data and isinstance(data["formats"], dict) and data["formats"].get("map"):
-                response["visualizations"].append({
-                    "type": "map",
-                    "data": data["formats"]["map"],
-                    "title": "Float Map"
-                })
-            elif "floats" in data and isinstance(data["floats"], list) and len(data["floats"]) > 0:
-                 # Auto-detect float list as map marker data
-                 response["visualizations"].append({
-                    "type": "map",
-                    "data": {
-                        "type": "markers",
-                        "data": { "markers": self._extract_markers(data["floats"]) }
-                    },
-                    "title": "Float Locations"
-                })
-                
-            # Graph Data
-            if "plot_data" in data and data["plot_data"]:
-                 response["visualizations"].append({
-                    "type": "graph",
-                    "data": {
-                        "type": "line_chart",
-                        "data": {
-                            "x": data["plot_data"]["data"].get("depths", []),
-                            "y": data["plot_data"]["data"].get("values", []),
-                            "x_label": "Depth (m)",
-                            "y_label": data.get("parameter", "Value"),
-                            "title": f"Depth Profile"
-                        }
-                    },
-                    "title": "Depth Profile"
-                })
-            elif "timeseries_data" in data and data["timeseries_data"]:
-                response["visualizations"].append({
-                    "type": "graph",
-                    "data": {
-                        "type": "line_chart",
-                        "data": {
-                            "x": data["timeseries_data"]["data"].get("dates", []),
-                            "y": data["timeseries_data"]["data"].get("values", []),
-                            "x_label": "Date",
-                            "y_label": data.get("parameter", "Value"),
-                            "title": f"Time Series"
-                        }
-                    },
-                    "title": "Time Series"
-                })
-            elif "comparison" in data and data["comparison"]:
-                # Convert comparison dict to standard graph format
-                comp = data["comparison"]
-                fids = list(comp.keys())
-                response["visualizations"].append({
-                    "type": "graph",
-                    "data": {
-                        "type": "bar_chart",
-                        "data": {
-                            "labels": [str(f) for f in fids],
-                            "datasets": [{
-                                "label": "Mean Value",
-                                "values": [comp[f]["statistics"]["avg_value"] for f in fids]
-                            }],
-                            "parameter": data.get("parameter", "Value")
-                        }
-                    },
-                    "title": "Float Comparison"
-                })
-            elif "formats" in data and isinstance(data["formats"], dict) and data["formats"].get("graph"):
-                 response["visualizations"].append({
-                    "type": "graph",
-                    "data": data["formats"]["graph"],
-                    "title": "Data Visualization"
-                })
-        
-        # Run extraction on main object
-        extract_viz(raw_data)
-        
-        # Run extraction on nested result object if it exists
-        if "result" in raw_data and isinstance(raw_data["result"], dict):
-            extract_viz(raw_data["result"])
+
+            # --- MAP DETECTION & ADAPTATION ---
+            # Case A: Detailed Map Data (from DataFormatter or Tools)
+            # We look for 'map_data' or direct 'trajectories' or 'type' indicators
+            map_source = data.get("map_data") or (data if "type" in data and "map" in data["type"] else None)
             
-        # 3. Default Text if Missing
-        if not response["text"]:
-            if response["visualizations"]:
-                response["text"] = "I processed your query. Check the visualizations below!"
-            else:
-                response["text"] = "I processed your request."
+            if map_source:
+                m_type = map_source.get("type", "")
                 
+                # ADAPTER: Convert Backend types to Frontend expectations
+                if m_type in ["trajectory_map", "trajectory"]:
+                    trajs = map_source.get("trajectories", [])
+                    if trajs and isinstance(trajs, list):
+                        t = trajs[0]
+                        # Ensure points use 'lat'/'lon' as expected by app.py for 'trajectory' type
+                        pts = [{"lat": p.get("latitude") or p.get("lat"), "lon": p.get("longitude") or p.get("lon")} 
+                               for p in (t.get("points") or t.get("trajectory") or [])]
+                        response["formats"]["map"] = {
+                            "type": "trajectory",
+                            "data": { "float_id": t.get("float_id"), "points": pts }
+                        }
+                        logger.info(f"Standardizer: Adapted single trajectory for float {t.get('float_id')}")
+                
+                elif m_type in ["multiple_trajectories_map", "multiple_trajectories"]:
+                    raw_trajs = map_source.get("trajectories", {})
+                    final_trajs = {}
+                    if isinstance(raw_trajs, list):
+                        for t in raw_trajs:
+                            fid = str(t.get("float_id"))
+                            pts = [{"lat": p.get("latitude") or p.get("lat"), "lon": p.get("longitude") or p.get("lon")} 
+                                   for p in (t.get("points") or t.get("trajectory") or [])]
+                            final_trajs[fid] = { "float_id": t.get("float_id"), "points": pts }
+                    elif isinstance(raw_trajs, dict):
+                        for fid, t_data in raw_trajs.items():
+                            orig_pts = t_data.get("points") or t_data.get("trajectory") or (t_data if isinstance(t_data, list) else [])
+                            pts = [{"lat": p.get("latitude") or p.get("lat"), "lon": p.get("longitude") or p.get("lon")} for p in orig_pts]
+                            final_trajs[str(fid)] = { "float_id": fid, "points": pts }
+                    
+                    response["formats"]["map"] = {
+                        "type": "multiple_trajectories",
+                        "data": { "trajectories": final_trajs }
+                    }
+                    logger.info("Standardizer: Adapted multiple trajectories")
+
+                elif m_type == "markers" or "markers" in map_source:
+                    # Pass-through if it's already markers or has marker list
+                    response["formats"]["map"] = map_source
+                
+                elif m_type == "regional_analysis":
+                    response["formats"]["map"] = {
+                        "type": "markers",
+                        "data": { "markers": map_source.get("markers", []) }
+                    }
+
+            # Case B: Explicit 'viz' schema (Legacy/Simplified)
+            if not response["formats"]["map"] and "viz" in data:
+                viz = data["viz"]
+                if isinstance(viz, dict):
+                    kind = viz.get("kind")
+                    spec = viz.get("spec", {})
+                    if kind in ["map", "trajectory_map"]:
+                        points = spec.get("points") or spec.get("markers") or []
+                        std_points = [{"lat": p.get("latitude") or p.get("lat"), "lon": p.get("longitude") or p.get("lon")} for p in points]
+                        
+                        if kind == "map":
+                            response["formats"]["map"] = { "type": "markers", "data": { "markers": std_points } }
+                        else:
+                            response["formats"]["map"] = { "type": "trajectory", "data": { "points": std_points } }
+                    elif kind == "multiple_trajectories_map":
+                        response["formats"]["map"] = { "type": "multiple_trajectories", "data": { "trajectories": spec.get("trajectories", {}) } }
+
+            # Case C: Fallback Marker Detection (Search results/SQL)
+            if not response["formats"]["map"]:
+                # Try to find floats or data lists
+                item_list = data.get("floats") or data.get("data")
+                if isinstance(item_list, list) and len(item_list) > 0:
+                    markers = []
+                    for itm in item_list:
+                        if not isinstance(itm, dict): continue
+                        lat = itm.get("latitude") or itm.get("lat") or itm.get("launch_latitude")
+                        lon = itm.get("longitude") or itm.get("lon") or itm.get("launch_longitude")
+                        if lat is not None and lon is not None:
+                            markers.append({
+                                "lat": lat,
+                                "lon": lon,
+                                "float_id": itm.get("platform_number") or itm.get("float_id"),
+                                "name": f"Float {itm.get('platform_number') or itm.get('float_id', '')}"
+                            })
+                    if markers:
+                        response["formats"]["map"] = {
+                            "type": "markers",
+                            "data": { "markers": markers }
+                        }
+
+            # --- GRAPH DETECTION ---
+            # Case A: Depth Profile / Time Series
+            if "plot_data" in data or "timeseries_data" in data:
+                plot = data.get("plot_data") or data.get("timeseries_data")
+                if isinstance(plot, dict) and "data" in plot:
+                    response["formats"]["graph"] = {
+                        "type": "line_chart",
+                        "data": {
+                            "x": plot["data"].get("depths") or plot["data"].get("dates", []),
+                            "y": plot["data"].get("values", []),
+                            "x_label": plot.get("metadata", {}).get("units", {}).get("depth", "Depth") if "depths" in plot["data"] else "Date",
+                            "y_label": data.get("parameter", "Value"),
+                            "title": f"{data.get('parameter', 'Value').title()} Profile"
+                        }
+                    }
+            # Case B: Comparisons (Bar Chart)
+            elif "comparison" in data and isinstance(data["comparison"], dict):
+                comp = data["comparison"]
+                float_ids = list(comp.keys())
+                response["formats"]["graph"] = {
+                    "type": "bar_chart",
+                    "data": {
+                        "labels": [str(f) for f in float_ids],
+                        "datasets": [{
+                            "label": data.get("parameter", "Value").title(),
+                            "values": [comp[f].get("statistics", {}).get("avg_value") for f in float_ids]
+                        }],
+                        "parameter": data.get("parameter", "Value")
+                    }
+                }
+            # Case C: Profile (Line Chart)
+            elif "viz" in data and data["viz"].get("kind") == "profile":
+                spec = data["viz"].get("spec", {})
+                if "data" in data:
+                    raw_points = data["data"]
+                    response["formats"]["graph"] = {
+                        "type": "line_chart",
+                        "data": {
+                            "x": [r.get(spec.get("x", "temperature")) for r in raw_points],
+                            "y": [r.get(spec.get("y", "pressure")) for r in raw_points],
+                            "x_label": spec.get("x_label"),
+                            "y_label": spec.get("y_label"),
+                            "title": "Parameter Profile"
+                        }
+                    }
+
+        # Run extraction on main data and 'result' nested object
+        extract_visuals(raw_data)
+        if isinstance(raw_data.get("result"), dict):
+            extract_visuals(raw_data["result"])
+
+        # 4. Final Polish: Set response_type and Default Text
+        m = response["formats"]["map"]
+        g = response["formats"]["graph"]
+        
+        if m and g: response["response_type"] = "multi"
+        elif m: response["response_type"] = "map"
+        elif g: response["response_type"] = "graph"
+        else: response["response_type"] = "text"
+
+        if not response["ai_synthesized_response"]:
+            if m or g:
+                response["ai_synthesized_response"] = "I found the data you requested. Please view the visualizations below."
+            else:
+                query_hint = f" for '{raw_data.get('query', 'your query')}'" if raw_data.get('query') else ""
+                response["ai_synthesized_response"] = f"I couldn't find any specific oceanographic data or visualizations{query_hint}. Please check if the float ID or region is correct."
+
         return response
 
     def _extract_markers(self, floats_list):

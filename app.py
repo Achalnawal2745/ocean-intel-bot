@@ -176,115 +176,126 @@ for message in st.session_state.messages:
         if message["role"] == "assistant" and "data" in message:
             data = message["data"]
             
-            # Display text response
-            ai_response = data.get("text", "I processed your request.")
-            st.markdown(ai_response)
-                
-            # Iterate over standardized visualizations
-            visualizations = data.get("visualizations", [])
+            # Create columns for side-by-side display
+            has_map = data.get("formats", {}).get("map") is not None
+            has_graph = data.get("formats", {}).get("graph") is not None
             
-            if visualizations:
-                # Determine layout based on counts
-                maps = [v for v in visualizations if v["type"] == "map"]
-                graphs = [v for v in visualizations if v["type"] == "graph"]
-                
-                # Create containers/columns
-                if maps and graphs:
-                    col1, col2 = st.columns(2)
-                elif maps or graphs:
-                    col1 = st.container()
-                    col2 = None
-                else:
-                    col1 = col2 = None
-
-                    # Render Maps
-                    if maps:
-                         with col1 if col2 else st.container():
-                            st.markdown(f"#### 🗺️ {maps[0].get('title', 'Map View')}")
-                            map_data = maps[0]["data"] # Take first map for now
+            if has_map and has_graph:
+                col1, col2 = st.columns(2)
+            elif has_map or has_graph:
+                col1 = st.container()
+                col2 = None
+            else:
+                col1 = col2 = None
+            
+            # Display map
+            if has_map:
+                with col1 if col2 else st.container():
+                    st.markdown("#### 🗺️ Map View")
+                    map_data = data["formats"]["map"]
+                    
+                    # Create map
+                    m = folium.Map(location=[0, 80], zoom_start=3)
+                    
+                    if map_data["type"] == "markers":
+                        # Add markers
+                        for marker in map_data["data"]["markers"]:
+                            folium.Marker(
+                                location=[marker["lat"], marker["lon"]],
+                                popup=f"<b>{marker['name']}</b><br>Lat: {marker['lat']}<br>Lon: {marker['lon']}",
+                                tooltip=marker["name"]
+                            ).add_to(m)
+                    
+                    elif map_data["type"] in ["trajectory", "multiple_trajectories"]:
+                        # Add trajectories
+                        if map_data["type"] == "trajectory":
+                            trajectories = [map_data["data"]]
+                        else:
+                            trajectories = list(map_data["data"]["trajectories"].values())
+                        
+                        colors = ['blue', 'red', 'green', 'purple', 'orange', 'darkred', 'darkblue']
+                        for idx, traj in enumerate(trajectories):
+                            if "trajectory" in traj:
+                                points = [(p["latitude"], p["longitude"]) for p in traj["trajectory"]]
+                            elif "points" in traj:
+                                points = [(p["lat"], p["lon"]) for p in traj["points"]]
+                            else:
+                                continue
                             
-                            m = folium.Map(location=[0, 80], zoom_start=3)
+                            color = colors[idx % len(colors)]
                             
-                            if map_data["type"] == "markers":
-                                for marker in map_data["data"]["markers"]:
-                                    folium.Marker(
-                                        location=[marker["lat"], marker["lon"]],
-                                        popup=f"<b>{marker['name']}</b>",
-                                        tooltip=marker["name"]
-                                    ).add_to(m)
+                            # Draw trajectory line
+                            folium.PolyLine(
+                                points,
+                                color=color,
+                                weight=2,
+                                opacity=0.8,
+                                popup=f"Float {traj.get('float_id', 'Unknown')}"
+                            ).add_to(m)
                             
-                            elif map_data["type"] in ["trajectory", "multiple_trajectories", "trajectory_map"]:
-                                if map_data["type"] == "trajectory":
-                                    trajectories = [map_data["data"]]
-                                elif map_data["type"] == "trajectory_map":
-                                    trajectories = map_data.get("trajectories", [])
-                                else:
-                                    trajectories = list(map_data["data"].get("trajectories", {}).values())
+                            # Add start marker
+                            if points:
+                                folium.Marker(
+                                    points[0],
+                                    icon=folium.Icon(color=color, icon='play'),
+                                    popup=f"Start: Float {traj.get('float_id', 'Unknown')}"
+                                ).add_to(m)
                                 
-                                colors = ['blue', 'red', 'green', 'purple', 'orange', 'darkred', 'darkblue']
-                                for idx, traj in enumerate(trajectories):
-                                    if "trajectory" in traj:
-                                        points = [(p["latitude"], p["longitude"]) for p in traj["trajectory"]]
-                                    elif "points" in traj:
-                                        points = [(p.get("lat") or p.get("latitude"), p.get("lon") or p.get("longitude")) for p in traj["points"]]
-                                    else:
-                                        continue
-                                    
-                                    color = colors[idx % len(colors)]
-                                    folium.PolyLine(points, color=color, weight=2, opacity=0.8).add_to(m)
-                                    if points:
-                                        folium.Marker(points[0], icon=folium.Icon(color=color, icon='play')).add_to(m)
-                                        folium.Marker(points[-1], icon=folium.Icon(color=color, icon='stop')).add_to(m)
-                            
-                            st_folium(m, width=700, height=500)
-
-                    # Render Graphs
-                    if graphs:
-                        with col2 if col2 else st.container():
-                            st.markdown(f"#### 📊 {graphs[0].get('title', 'Graph View')}")
-                            graph_data = graphs[0]["data"]
-                            
-                            fig = go.Figure()
-                            
-                            if graph_data["type"] == "bar_chart":
-                                for dataset in graph_data["data"]["datasets"]:
-                                    fig.add_trace(go.Bar(
-                                        name=dataset["label"],
-                                        x=graph_data["data"]["labels"],
-                                        y=dataset["values"]
-                                    ))
-                                fig.update_layout(barmode='group')
-                                
-                            elif graph_data["type"] == "line_chart":
-                                fig.add_trace(go.Scatter(
-                                    x=graph_data["data"]["x"],
-                                    y=graph_data["data"]["y"],
-                                    mode='lines+markers'
-                                ))
-                            
-                            if "data" in graph_data and "parameter" in graph_data["data"]:
-                                param = graph_data["data"]["parameter"]
-                                fig.update_layout(
-                                    title=graphs[0].get("title", ""),
-                                    xaxis_title=graph_data["data"].get("x_label", ""),
-                                    yaxis_title=graph_data["data"].get("y_label", param),
-                                    height=500
-                                )
-                                
-                            st.plotly_chart(fig, use_container_width=True)
-                
-
-
-# Footer
-st.markdown("---")
-st.markdown(
-    """
-    <div style='text-align: center; color: #666; font-size: 0.9rem;'>
-        🌊 ARGO Ocean Intelligence System | Powered by AI & Real-time Ocean Data
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+                                # Add end marker
+                                folium.Marker(
+                                    points[-1],
+                                    icon=folium.Icon(color=color, icon='stop'),
+                                    popup=f"End: Float {traj.get('float_id', 'Unknown')}"
+                                ).add_to(m)
+                    
+                    st_folium(m, width=700, height=500)
+            
+            # Display graph
+            if has_graph:
+                with col2 if col2 else st.container():
+                    st.markdown("#### 📊 Graph View")
+                    graph_data = data["formats"]["graph"]
+                    
+                    if graph_data["type"] == "bar_chart":
+                        # Create bar chart
+                        fig = go.Figure()
+                        
+                        for dataset in graph_data["data"]["datasets"]:
+                            fig.add_trace(go.Bar(
+                                name=dataset["label"],
+                                x=graph_data["data"]["labels"],
+                                y=dataset["values"]
+                            ))
+                        
+                        fig.update_layout(
+                            title=f"{graph_data['data']['parameter'].title()} Comparison",
+                            xaxis_title="Float ID",
+                            yaxis_title=f"{graph_data['data']['parameter'].title()} (PSU)" if graph_data['data']['parameter'] == 'salinity' else graph_data['data']['parameter'].title(),
+                            barmode='group',
+                            height=500
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    elif graph_data["type"] == "line_chart":
+                        # Create line chart
+                        fig = go.Figure()
+                        
+                        fig.add_trace(go.Scatter(
+                            x=graph_data["data"]["x"],
+                            y=graph_data["data"]["y"],
+                            mode='lines+markers',
+                            name=graph_data["data"].get("title", "Data")
+                        ))
+                        
+                        fig.update_layout(
+                            title=graph_data["data"].get("title", "Line Chart"),
+                            xaxis_title=graph_data["data"].get("x_label", "X"),
+                            yaxis_title=graph_data["data"].get("y_label", "Y"),
+                            height=500
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
 
 # Chat input
 if prompt := st.chat_input("Ask about ocean data... (e.g., 'Show floats in Indian Ocean')"):
@@ -310,14 +321,21 @@ if prompt := st.chat_input("Ask about ocean data... (e.g., 'Show floats in India
                 
                 data = response.json()
                 
+                # Display AI response
+                ai_response = data.get("ai_synthesized_response", "")
+                if not ai_response:
+                    ai_response = "I processed your query. Check the visualizations below!"
+                
+                st.markdown(ai_response)
+                
                 # Store message with data
                 st.session_state.messages.append({
                     "role": "assistant",
-                    "content": data.get("text", "I processed your request."),
+                    "content": ai_response,
                     "data": data
                 })
                 
-                # Rerun to display visualizations via main loop
+                # Rerun to display visualizations
                 st.rerun()
                 
             except Exception as e:
@@ -327,3 +345,14 @@ if prompt := st.chat_input("Ask about ocean data... (e.g., 'Show floats in India
                     "role": "assistant",
                     "content": error_msg
                 })
+
+# Footer
+st.markdown("---")
+st.markdown(
+    """
+    <div style='text-align: center; color: #666; font-size: 0.9rem;'>
+        🌊 ARGO Ocean Intelligence System | Powered by AI & Real-time Ocean Data
+    </div>
+    """,
+    unsafe_allow_html=True
+)
