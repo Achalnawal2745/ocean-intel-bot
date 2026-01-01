@@ -5,7 +5,7 @@ echo ========================================
 echo.
 echo Starting backend server...
 start "Backend" cmd /k "python -m uvicorn backend16:app --reload"
-timeout /t 3 /nobreak > nul
+timeout /t 60 /nobreak > nul
 echo.
 echo Starting frontend...
 start "Frontend" cmd /k "streamlit run app.py"

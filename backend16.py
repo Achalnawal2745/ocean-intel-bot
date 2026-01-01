@@ -649,6 +649,12 @@ class OptimizedArgoMCPServer:
     - Only these parameters exist: temperature, salinity, pressure, depth_m
     - Only these regions exist: arabian_sea, indian_ocean, bay_of_bengal, equator, south_atlantic, north_pacific
 
+    6. **Analytical/Aggregation Queries → Layer 3 (SQL)**
+    - If query asks for CALCULATIONS (average, sum, count, min, max, median) that tools don't provide → return null WITHOUT "requires_multiple_tools"
+    - Examples: "average temperature at 100m", "total floats in region", "maximum salinity"
+    - These queries need SQL aggregation, NOT multiple tools
+    - Return: {{"tool": null, "confidence": 0.0, "reasoning": "Query requires SQL aggregation/calculation not available in tools", "requires_sql": true}}
+
     📊 CURRENT QUERY CONTEXT:
     Query: "{query}"
     Previous Context: {json.dumps(context, default=str)}
@@ -669,6 +675,14 @@ class OptimizedArgoMCPServer:
         "parameters": {{"float_id": 2902296, "parameter": "temperature"}},
         "confidence": 0.98,
         "reasoning": "Single float, single parameter - direct tool match"
+    }}
+
+    For ANALYTICAL queries (need SQL aggregation):
+    {{
+        "tool": null,
+        "confidence": 0.0,
+        "reasoning": "Query requires SQL aggregation (average/sum/count) not available in tools",
+        "requires_sql": true
     }}
 
     For COMPLEX queries (multiple tools needed):
@@ -1261,7 +1275,24 @@ class OptimizedArgoMCPServer:
                 "confidence": confidence,
                 "timestamp": datetime.now().isoformat()
             }
-        
+    
+        # Check if query requires SQL aggregation (Layer 3)
+        if layer1_result.get('requires_sql'):
+            logger.info("LAYER 1 DETECTED ANALYTICAL QUERY → LAYER 3: SQL Generation")
+            layer3_result = await self.sql_generator.generate_sql_response(query, context)
+            
+            self.memory.add_exchange(session_id, query, layer3_result, "sql_generation", {})
+            
+            if layer3_result.get("success"):
+                logger.info("LAYER 3 SUCCESS - SQL generation completed")
+                return {
+                    "result": layer3_result,
+                    "processing_source": "sql_generation",
+                    "intent": "analytical_query", 
+                    "confidence": 0.8,
+                    "timestamp": datetime.now().isoformat()
+                }
+    
         if layer1_result.get('requires_multiple_tools'):
             logger.info("LAYER 1 DETECTED MULTI-TOOL QUERY → LAYER 2: Complex Orchestration")
             layer2_result = await self.layer2_complex_orchestration(query, context)
@@ -1500,7 +1531,18 @@ class OptimizedArgoMCPServer:
                             final_trajs[fid] = { "float_id": t.get("float_id"), "points": pts }
                     elif isinstance(raw_trajs, dict):
                         for fid, t_data in raw_trajs.items():
-                            orig_pts = t_data.get("points") or t_data.get("trajectory") or (t_data if isinstance(t_data, list) else [])
+                            # Handle nested structure from get_floats_trajectories
+                            if isinstance(t_data, dict) and "trajectory_data" in t_data:
+                                # Extract from nested trajectory_data
+                                traj_data = t_data["trajectory_data"]
+                                if "viz" in traj_data and "spec" in traj_data["viz"]:
+                                    orig_pts = traj_data["viz"]["spec"].get("points", [])
+                                else:
+                                    orig_pts = traj_data.get("points") or traj_data.get("trajectory") or []
+                            else:
+                                # Direct points access
+                                orig_pts = t_data.get("points") or t_data.get("trajectory") or (t_data if isinstance(t_data, list) else [])
+                            
                             pts = [{"lat": p.get("latitude") or p.get("lat"), "lon": p.get("longitude") or p.get("lon")} for p in orig_pts]
                             final_trajs[str(fid)] = { "float_id": fid, "points": pts }
                     
@@ -1623,6 +1665,30 @@ class OptimizedArgoMCPServer:
         extract_visuals(raw_data)
         if isinstance(raw_data.get("result"), dict):
             extract_visuals(raw_data["result"])
+            
+            # Handle Layer 3 SQL generation GRAPHS format
+            result_obj = raw_data["result"]
+            if "GRAPHS" in result_obj and isinstance(result_obj["GRAPHS"], dict):
+                graphs = result_obj["GRAPHS"]
+                graph_type = graphs.get("type", "2D")
+                
+                if graph_type == "2D":
+                    # Convert Layer 3 format to unified format
+                    x_data = graphs.get("x_data", [])
+                    y_data = graphs.get("y_data", [])
+                    
+                    # If multiple series, take the first one for now
+                    if isinstance(x_data, list) and len(x_data) > 0:
+                        response["formats"]["graph"] = {
+                            "type": "line_chart",
+                            "data": {
+                                "x": x_data[0] if isinstance(x_data[0], list) else x_data,
+                                "y": y_data[0] if isinstance(y_data[0], list) else y_data,
+                                "x_label": graphs.get("x_label", "X"),
+                                "y_label": graphs.get("y_label", "Y"),
+                                "title": graphs.get("title", "Graph")
+                            }
+                        }
 
         # 4. Final Polish: Set response_type and Default Text
         m = response["formats"]["map"]
@@ -1823,14 +1889,32 @@ class OptimizedArgoMCPServer:
                 
                 # FIX: Check if get_trajectory returned SUCCESS (has map_data) or ERROR
                 if isinstance(trajectory_result, dict) and "map_data" in trajectory_result:
-                    # ✅ SUCCESS - we have trajectory data
+                    # ✅ SUCCESS - Extract points in frontend format
+                    traj_data = trajectory_result.get("map_data", {})
+                    points = []
+                    
+                    # Extract points from viz.spec if available
+                    if "viz" in traj_data and "spec" in traj_data["viz"]:
+                        raw_points = traj_data["viz"]["spec"].get("points", [])
+                        # Convert to lat/lon format
+                        points = [{"lat": p.get("latitude") or p.get("lat"), 
+                                  "lon": p.get("longitude") or p.get("lon")} 
+                                 for p in raw_points]
+                    else:
+                        # Fallback: try trajectory_result.viz.spec.points
+                        if "viz" in trajectory_result and "spec" in trajectory_result["viz"]:
+                            raw_points = trajectory_result["viz"]["spec"].get("points", [])
+                            points = [{"lat": p.get("latitude") or p.get("lat"), 
+                                      "lon": p.get("longitude") or p.get("lon")} 
+                                     for p in raw_points]
+                    
                     all_trajectories[float_id] = {
-                        "trajectory_data": trajectory_result,
-                        "data_points": trajectory_result.get("data_points", 0),
+                        "float_id": float_id,
+                        "points": points,
                         "status": "success"
                     }
                     successful_trajectories += 1
-                    logger.info(f"✅ Successfully retrieved trajectory for float {float_id} with {trajectory_result.get('data_points', 0)} points")
+                    logger.info(f"✅ Successfully retrieved trajectory for float {float_id} with {len(points)} points")
                     
                 elif isinstance(trajectory_result, dict) and "error" in trajectory_result:
                     # ❌ ERROR from get_trajectory
