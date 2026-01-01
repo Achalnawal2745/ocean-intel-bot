@@ -1469,7 +1469,7 @@ class OptimizedArgoMCPServer:
             # --- MAP DETECTION & ADAPTATION ---
             # Case A: Detailed Map Data (from DataFormatter or Tools)
             # We look for 'map_data' or direct 'trajectories' or 'type' indicators
-            map_source = data.get("map_data") or (data if "type" in data and "map" in data["type"] else None)
+            map_source = data.get("map_data") or (data if "type" in data and ("map" in data["type"] or "trajectory" in data["type"]) else None)
             
             if map_source:
                 m_type = map_source.get("type", "")
@@ -1535,7 +1535,20 @@ class OptimizedArgoMCPServer:
                         else:
                             response["formats"]["map"] = { "type": "trajectory", "data": { "points": std_points } }
                     elif kind == "multiple_trajectories_map":
-                        response["formats"]["map"] = { "type": "multiple_trajectories", "data": { "trajectories": spec.get("trajectories", {}) } }
+                        trajs_list = spec.get("trajectories", [])
+                        trajs_dict = {}
+                        if isinstance(trajs_list, list):
+                            for t in trajs_list:
+                                if isinstance(t, dict):
+                                    fid = str(t.get("float_id", "unknown"))
+                                    trajs_dict[fid] = t
+                        else:
+                            trajs_dict = trajs_list # Fallback
+                            
+                        response["formats"]["map"] = { 
+                            "type": "multiple_trajectories", 
+                            "data": { "trajectories": trajs_dict } 
+                        }
 
             # Case C: Fallback Marker Detection (Search results/SQL)
             if not response["formats"]["map"]:

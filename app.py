@@ -211,9 +211,12 @@ for message in st.session_state.messages:
                         if map_data["type"] == "trajectory":
                             trajectories = [map_data["data"]]
                         else:
-                            # Defensive check to avoid KeyError if 'trajectories' is missing
+                            # Defensive check to handle both list and dict structures
                             traj_dict = map_data.get("data", {}).get("trajectories", {})
-                            trajectories = list(traj_dict.values())
+                            if isinstance(traj_dict, dict):
+                                trajectories = list(traj_dict.values())
+                            else:
+                                trajectories = traj_dict if isinstance(traj_dict, list) else []
                         
                         colors = ['blue', 'red', 'green', 'purple', 'orange', 'darkred', 'darkblue']
                         for idx, traj in enumerate(trajectories):
