@@ -1489,7 +1489,8 @@ class OptimizedArgoMCPServer:
                         logger.info(f"Standardizer: Adapted single trajectory for float {t.get('float_id')}")
                 
                 elif m_type in ["multiple_trajectories_map", "multiple_trajectories"]:
-                    raw_trajs = map_source.get("trajectories", {})
+                    # Try both keys for robustness
+                    raw_trajs = map_source.get("trajectories") or map_source.get("trajectories_data") or {}
                     final_trajs = {}
                     if isinstance(raw_trajs, list):
                         for t in raw_trajs:
@@ -1858,7 +1859,7 @@ class OptimizedArgoMCPServer:
             "total_floats": len(float_ids),
             "successful_trajectories": successful_trajectories,
             "failed_trajectories": len(float_ids) - successful_trajectories,
-            "trajectories_data": all_trajectories,
+            "trajectories": all_trajectories,
             "viz": {
                 "kind": "multiple_trajectories_map",
                 "spec": {
