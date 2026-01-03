@@ -1,4 +1,4 @@
-# 🚀 Quick Start Guide
+# 🚀 Float Chat - Quick Start Guide
 
 ## Start the System
 

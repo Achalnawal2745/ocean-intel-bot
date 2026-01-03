@@ -1,5 +1,5 @@
 """
-ARGO Ocean Intelligence - Streamlit Frontend
+Float Chat - Streamlit Frontend
 AI-powered conversational interface for ARGO float data
 """
 
@@ -13,7 +13,7 @@ import json
 
 # Page configuration
 st.set_page_config(
-    page_title="🌊 ARGO Ocean Intelligence",
+    page_title="🌊 Float Chat -ARGO OCEAN INTELLIGENCE SYSTEM",
     page_icon="🌊",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -65,7 +65,7 @@ if "session_id" not in st.session_state:
 
 # Sidebar
 with st.sidebar:
-    st.markdown("### 🌊 ARGO Ocean Intelligence")
+    st.markdown("### 🌊 Float Chat")
     st.markdown("---")
     
     # System status
@@ -164,7 +164,7 @@ with st.sidebar:
         st.rerun()
 
 # Main content
-st.markdown('<div class="main-header">🌊 ARGO Ocean Intelligence</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🌊 Float Chat -ARGO OCEAN INTELLIGENCE SYSTEM</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">AI-Powered Conversational Interface for Ocean Data</div>', unsafe_allow_html=True)
 
 # Display chat messages
